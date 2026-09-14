@@ -1,0 +1,220 @@
+import { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { api } from '../../src/api/client';
+import { COLORS, SPACING } from '../../src/constants/config';
+import type { Client } from '../../src/types';
+
+export default function SearchScreen() {
+  const [query, setQuery] = useState('');
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  const handleSearch = async () => {
+    if (!query.trim()) {
+      Alert.alert('Search', 'Please enter a name, phone or client ID');
+      return;
+    }
+    setLoading(true);
+    setSearched(true);
+    try {
+      // Note: /clients currently requires API Key on server side.
+      // For now we show a helpful message if it fails.
+      const res = await api.getClients({ q: query.trim(), limit: 30 });
+      if (res.success && res.data) {
+        setClients(res.data);
+      } else {
+        setClients([]);
+        Alert.alert(
+          'API Notice',
+          'Client search requires a server API key. Ask the admin to allow JWT for /clients or provide a key.'
+        );
+      }
+    } catch (e: any) {
+      setClients([]);
+      const msg =
+        e?.response?.data?.error ||
+        'Could not reach the API. Check your connection or API configuration.';
+      Alert.alert('Search failed', msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openClient = (id: string) => {
+    router.push(`/client/${id}`);
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
+        <TextInput
+          style={styles.input}
+          placeholder="Search by name, phone or ID..."
+          placeholderTextColor="#9CA3AF"
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={handleSearch}
+          returnKeyType="search"
+          autoCapitalize="none"
+        />
+        <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+          <Text style={styles.searchBtnText}>Search</Text>
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={COLORS.accent} />
+        </View>
+      ) : (
+        <FlatList
+          data={clients}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: SPACING.md, paddingBottom: 40 }}
+          ListEmptyComponent={
+            searched ? (
+              <View style={styles.center}>
+                <Ionicons name="people-outline" size={48} color="#CBD5E1" />
+                <Text style={styles.emptyText}>No clients found</Text>
+              </View>
+            ) : (
+              <View style={styles.center}>
+                <Ionicons name="search-outline" size={48} color="#CBD5E1" />
+                <Text style={styles.emptyText}>
+                  Search for a client to view portfolio
+                </Text>
+              </View>
+            )
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => openClient(item.id)}
+            >
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {(item.name || '?').charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.cardBody}>
+                <Text style={styles.clientName}>{item.name}</Text>
+                <Text style={styles.clientMeta}>
+                  {item.phone || 'No phone'} • ID: {item.id}
+                </Text>
+                {item.status && (
+                  <Text style={styles.status}>{item.status}</Text>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    margin: SPACING.md,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.text,
+    paddingVertical: 8,
+  },
+  searchBtn: {
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  searchBtnText: {
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  emptyText: {
+    marginTop: 12,
+    color: COLORS.textSecondary,
+    fontSize: 15,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarText: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  cardBody: {
+    flex: 1,
+  },
+  clientName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  clientMeta: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  status: {
+    fontSize: 12,
+    color: COLORS.accent,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+});
