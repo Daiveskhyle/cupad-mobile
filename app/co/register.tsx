@@ -23,9 +23,9 @@ export default function RegisterClientScreen() {
     if (!phone.trim()) return Alert.alert('Required', 'Enter phone number');
     setLoading(true);
     try {
-      const { api } = await import('../../src/api/client');
+      const { registerOnlineOrQueue } = await import('../../src/services/data');
       const fee = parseFloat(regFee.replace(/,/g, '')) || 0;
-      const res = await api.registerClient({
+      const res = await registerOnlineOrQueue({
         name: name.trim(),
         phone: phone.trim(),
         email: email.trim() || undefined,

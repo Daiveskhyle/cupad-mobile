@@ -28,8 +28,8 @@ export default function DisbursementScreen() {
     const total = p * (1 + rate / 100);
     setLoading(true);
     try {
-      const { api } = await import('../../src/api/client');
-      const res = await api.disburseLoan({
+      const { disburseOnlineOrQueue } = await import('../../src/services/data');
+      const res = await disburseOnlineOrQueue({
         client_id: client.id,
         principal: p,
         interest_rate: rate,

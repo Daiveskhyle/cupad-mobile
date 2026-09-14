@@ -7,16 +7,26 @@ import { SPACING, RADIUS } from '../../src/constants/config';
 import { getRoleConfig, ACTION_META } from '../../src/constants/roles';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { api } from '../../src/api/client';
+import { loadDashboardStats } from '../../src/services/data';
 
 export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
   const roleCfg = getRoleConfig(user?.role);
   const colors = useThemeStore((s) => s.colors);
   const [stats, setStats] = useState<any>(null);
+  const [statsNote, setStatsNote] = useState<string | null>(null);
+  const [statsSource, setStatsSource] = useState<string>('');
 
   useEffect(() => {
-    api.getDashboardStats().then(setStats).catch(() => {});
+    let alive = true;
+    (async () => {
+      const res = await loadDashboardStats();
+      if (!alive) return;
+      setStats(res.data);
+      setStatsSource(res.source);
+      setStatsNote(res.error || null);
+    })();
+    return () => { alive = false; };
   }, []);
 
   const displayName =
@@ -79,6 +89,16 @@ export default function DashboardScreen() {
           </View>
         </View>
       )}
+
+      {statsNote ? (
+        <View style={[styles.infoCard, { backgroundColor: colors.infoBg, marginBottom: 12 }]}>
+          <Ionicons name="information-circle" size={18} color={colors.primary} />
+          <Text style={[styles.infoText, { color: colors.primaryDark }]}>
+            {statsNote}
+            {statsSource === 'cache' ? ' (cached)' : ''}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Overview stats – CO PHP dashboard parity */}
       {!isClient && isField && (

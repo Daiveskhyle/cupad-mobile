@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../src/store/auth';
 import { useThemeStore } from '../src/store/theme';
+import { getDb } from '../src/db/sqlite';
 
 export default function RootLayout() {
   const loadUser = useAuthStore((s) => s.loadUser);
@@ -13,6 +14,7 @@ export default function RootLayout() {
   useEffect(() => {
     loadTheme();
     loadUser();
+    getDb().catch(() => {});
   }, []);
 
   return (

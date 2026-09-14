@@ -23,8 +23,8 @@ export default function SavingsWithdrawalScreen() {
     if (!value || value <= 0) return Alert.alert('Required', 'Enter a valid amount');
     setLoading(true);
     try {
-      const { api } = await import('../../src/api/client');
-      const res = await api.withdrawSavings({
+      const { withdrawOnlineOrQueue } = await import('../../src/services/data');
+      const res = await withdrawOnlineOrQueue({
         client_id: client.id,
         amount: value,
         reason: reason || undefined,

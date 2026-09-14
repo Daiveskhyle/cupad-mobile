@@ -135,8 +135,10 @@ class ApiClient {
         '/dashboard/stats'
       );
       return data.success ? data.data : null;
-    } catch {
-      return null;
+    } catch (e: any) {
+      // 404 = old API; rethrow network errors for offline layer messaging
+      if (e?.response?.status === 404) return null;
+      throw e;
     }
   }
 
@@ -146,8 +148,9 @@ class ApiClient {
         params: { limit },
       });
       return data.data || [];
-    } catch {
-      return [];
+    } catch (e: any) {
+      if (e?.response?.status === 404) return [];
+      throw e;
     }
   }
 

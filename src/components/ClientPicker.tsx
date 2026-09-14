@@ -10,7 +10,7 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../api/client';
+import { searchClients } from '../services/data';
 import { useThemeStore } from '../store/theme';
 import { SPACING, RADIUS } from '../constants/config';
 import type { Client } from '../types';
@@ -31,7 +31,7 @@ export function ClientPicker({ selected, onSelect }: Props) {
     if (!q.trim()) return;
     setLoading(true);
     try {
-      const res = await api.getClients({ q: q.trim(), limit: 20 });
+      const res = await searchClients(q.trim(), 20);
       setResults(res.data || []);
     } catch {
       setResults([]);

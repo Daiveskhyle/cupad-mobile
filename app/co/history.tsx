@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator } f
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useThemeStore } from '../../src/store/theme';
-import { api } from '../../src/api/client';
+import { loadActivities } from '../../src/services/data';
 import { SPACING, RADIUS } from '../../src/constants/config';
 
 const typeColor: Record<string, string> = {
@@ -19,17 +19,14 @@ export default function CoHistoryScreen() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
   const load = async () => {
-    try {
-      const data = await api.getActivities(40);
-      setItems(data);
-    } catch {
-      setItems([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    const res = await loadActivities(40);
+    setItems(res.data);
+    setNote(res.error || null);
+    setLoading(false);
+    setRefreshing(false);
   };
 
   useFocusEffect(
@@ -48,9 +45,15 @@ export default function CoHistoryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {note ? (
+        <View style={[styles.info, { backgroundColor: colors.infoBg }]}>
+          <Ionicons name="information-circle" size={18} color={colors.primary} />
+          <Text style={{ flex: 1, color: colors.primaryDark, fontSize: 13, marginLeft: 8 }}>{note}</Text>
+        </View>
+      ) : null}
       <FlatList
         data={items}
-        keyExtractor={(i, idx) => String(i.transaction_id || idx)}
+        keyExtractor={(i, idx) => String(i.transaction_id || i.id || idx)}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />
         }
@@ -58,8 +61,8 @@ export default function CoHistoryScreen() {
         ListEmptyComponent={
           <View style={{ alignItems: 'center', marginTop: 60 }}>
             <Ionicons name="time-outline" size={48} color={colors.textMuted} />
-            <Text style={{ color: colors.textSecondary, marginTop: 12, textAlign: 'center' }}>
-              No activity yet.{'\n'}Collect savings or loans to see history here.
+            <Text style={{ color: colors.textSecondary, marginTop: 12, textAlign: 'center', paddingHorizontal: 24 }}>
+              No activity yet.{'\n\n'}History fills after collections, or when API v1.2 is deployed and you pull to refresh.
             </Text>
           </View>
         }
@@ -84,6 +87,14 @@ export default function CoHistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  info: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.md,
+    padding: 12,
+    borderRadius: RADIUS.md,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

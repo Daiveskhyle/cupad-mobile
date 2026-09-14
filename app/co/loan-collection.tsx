@@ -23,8 +23,8 @@ export default function LoanCollectionScreen() {
     if (!value || value <= 0) return Alert.alert('Required', 'Enter a valid amount');
     setLoading(true);
     try {
-      const { api } = await import('../../src/api/client');
-      const res = await api.collectLoan({
+      const { collectLoanOnlineOrQueue } = await import('../../src/services/data');
+      const res = await collectLoanOnlineOrQueue({
         client_id: client.id,
         amount: value,
         notes: notes || undefined,
