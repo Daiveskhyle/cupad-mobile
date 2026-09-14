@@ -189,7 +189,7 @@ if ($method === 'GET' && preg_match('#^portfolio/([^/]+)$#', $route, $m)) {
     respond(['success' => true, 'data' => portfolioData($m[1])]);
 }
 
-// ---------- Dashboard stats (JWT) ----------
+// ---------- Dashboard stats (JWT) – matches CO PHP dashboard ----------
 if ($method === 'GET' && $route === 'dashboard/stats') {
     $auth = requireJwt();
     $user = currentUser(['type' => 'jwt', 'payload' => $auth]);
@@ -200,81 +200,218 @@ if ($method === 'GET' && $route === 'dashboard/stats') {
     $officer = $user['username'];
     $today = date('Y-m-d');
     $monthStart = date('Y-m-01');
+    $currentMonth = date('Y-m');
 
-    // Scope filter for client-based aggregates
-    $clientFilter = '1=1';
-    $params = [];
-    if ($role === 'co') {
-        $clientFilter = 'c.officer_username = ?';
-        $params[] = $officer;
-    } elseif ($role === 'bm' && !empty($user['branch_id'])) {
-        $clientFilter = 'c.branch_id = ?';
-        $params[] = $user['branch_id'];
-    } elseif ($role === 'am' && !empty($user['area_id'])) {
-        $clientFilter = 'c.branch_id IN (SELECT id FROM branches WHERE area_id = ?)';
-        $params[] = $user['area_id'];
+    // Location names
+    $branch_name = $area_name = $zone_name = null;
+    try {
+        $s = $pdo->prepare("SELECT b.name as branch_name, a.name as area_name, z.name as zone_name
+            FROM users u
+            LEFT JOIN branches b ON u.branch_id = b.id
+            LEFT JOIN areas a ON u.area_id = a.id
+            LEFT JOIN zones z ON u.zone_id = z.id
+            WHERE u.id = ?");
+        $s->execute([(int)$user['id']]);
+        $loc = $s->fetch() ?: [];
+        $branch_name = $loc['branch_name'] ?? null;
+        $area_name = $loc['area_name'] ?? null;
+        $zone_name = $loc['zone_name'] ?? null;
+    } catch (Throwable $e) { /* ignore */ }
+
+    // Officer-scoped stats (CO-style) when role is co; broader scope for managers
+    $isCo = ($role === 'co');
+
+    $monthly_savings = 0.0;
+    $monthly_disbursed = 0.0;
+    $active_loans_count = 0;
+    $grand_savings = 0.0;
+    $grand_loans = 0.0;
+    $clients_count = 0;
+    $savings_today = 0.0;
+    $collected_today = 0.0;
+    $collected_month = 0.0;
+    $unions = [];
+
+    try {
+        if ($isCo) {
+            $s = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN amount < 0 OR LOWER(COALESCE(type,'')) IN ('withdrawal','return','adjust') THEN -ABS(amount) ELSE amount END), 0)
+                FROM saving_collections WHERE officer = ? AND DATE_FORMAT(date, '%Y-%m') = ?");
+            $s->execute([$officer, $currentMonth]);
+            $monthly_savings = (float)$s->fetchColumn();
+        } else {
+            // broader handled below via client filter
+        }
+    } catch (Throwable $e) { /* ignore */ }
+
+    try {
+        if ($isCo) {
+            $s = $pdo->prepare("SELECT COALESCE(SUM(principal),0) FROM disbursements WHERE officer = ? AND DATE_FORMAT(date, '%Y-%m') = ?");
+            $s->execute([$officer, $currentMonth]);
+            $monthly_disbursed = (float)$s->fetchColumn();
+        }
+    } catch (Throwable $e) { /* ignore */ }
+
+    try {
+        if ($isCo) {
+            $s = $pdo->prepare("SELECT COUNT(DISTINCT client_id) FROM disbursements WHERE officer = ? AND (status IS NULL OR status != 'completed') AND remaining_balance > 0");
+            $s->execute([$officer]);
+            $active_loans_count = (int)$s->fetchColumn();
+        }
+    } catch (Throwable $e) { /* ignore */ }
+
+    // Portfolio totals + unions (CO uses officer_username on clients)
+    try {
+        if ($isCo) {
+            // Prefer saving_balances table like PHP dashboard
+            $sql = "SELECT c.id, c.`union`,
+                    COALESCE((SELECT balance FROM saving_balances WHERE client_id = c.id LIMIT 1), 0) as total_savings,
+                    COALESCE(l.active_balance, 0) as loan_balance
+                FROM clients c
+                LEFT JOIN (
+                    SELECT client_id, SUM(remaining_balance) as active_balance
+                    FROM disbursements
+                    WHERE (status IS NULL OR status != 'completed') AND remaining_balance > 0
+                    GROUP BY client_id
+                ) l ON c.id = l.client_id
+                WHERE c.officer_username = ? AND (c.status = 'active' OR c.status IS NULL) AND (c.deleted_at IS NULL OR c.deleted_at = '')";
+            try {
+                $s = $pdo->prepare($sql);
+                $s->execute([$officer]);
+            } catch (Throwable $e) {
+                // fallback without saving_balances
+                $sql = "SELECT c.id, c.`union`,
+                        COALESCE((SELECT SUM(CASE WHEN amount < 0 OR LOWER(COALESCE(type,'')) IN ('withdrawal','return','adjust') THEN -ABS(amount) ELSE amount END) FROM saving_collections WHERE client_id = c.id), 0) as total_savings,
+                        COALESCE(l.active_balance, 0) as loan_balance
+                    FROM clients c
+                    LEFT JOIN (
+                        SELECT client_id, SUM(remaining_balance) as active_balance
+                        FROM disbursements WHERE remaining_balance > 0 GROUP BY client_id
+                    ) l ON c.id = l.client_id
+                    WHERE c.officer_username = ? AND (c.deleted_at IS NULL OR c.deleted_at = '')";
+                $s = $pdo->prepare($sql);
+                $s->execute([$officer]);
+            }
+            $union_raw = [];
+            while ($row = $s->fetch()) {
+                $sav = (float)($row['total_savings'] ?? 0);
+                $loan = (float)($row['loan_balance'] ?? 0);
+                $grand_savings += $sav;
+                $grand_loans += $loan;
+                $clients_count++;
+                $u_name = trim((string)($row['union'] ?? ''));
+                if ($u_name === '') $u_name = 'Unassigned';
+                else $u_name = ucwords(strtolower($u_name));
+                if (!isset($union_raw[$u_name])) {
+                    $union_raw[$u_name] = ['name' => $u_name, 'clients' => 0, 'savings' => 0, 'loans' => 0];
+                }
+                $union_raw[$u_name]['clients']++;
+                $union_raw[$u_name]['savings'] += $sav;
+                $union_raw[$u_name]['loans'] += $loan;
+            }
+            ksort($union_raw);
+            $unions = array_values($union_raw);
+        }
+    } catch (Throwable $e) { /* ignore */ }
+
+    // Today savings / loan collections for CO
+    try {
+        if ($isCo) {
+            $s = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN amount > 0 AND LOWER(COALESCE(type,'')) NOT IN ('withdrawal','return','adjust') THEN amount ELSE 0 END),0)
+                FROM saving_collections WHERE officer = ? AND CAST(date AS DATE) = ?");
+            $s->execute([$officer, $today]);
+            $savings_today = (float)$s->fetchColumn();
+            $s = $pdo->prepare("SELECT COALESCE(SUM(amount_collected),0) FROM loan_collections WHERE officer = ? AND CAST(date AS DATE) = ?");
+            $s->execute([$officer, $today]);
+            $collected_today = (float)$s->fetchColumn();
+            $s = $pdo->prepare("SELECT COALESCE(SUM(amount_collected),0) FROM loan_collections WHERE officer = ? AND DATE_FORMAT(date, '%Y-%m') = ?");
+            $s->execute([$officer, $currentMonth]);
+            $collected_month = (float)$s->fetchColumn();
+        }
+    } catch (Throwable $e) { /* ignore */ }
+
+    // Non-CO / manager scope (existing logic expanded)
+    if (!$isCo) {
+        $clientFilter = '1=1';
+        $params = [];
+        if ($role === 'bm' && !empty($user['branch_id'])) {
+            $clientFilter = 'c.branch_id = ?';
+            $params[] = $user['branch_id'];
+        } elseif ($role === 'am' && !empty($user['area_id'])) {
+            $clientFilter = 'c.branch_id IN (SELECT id FROM branches WHERE area_id = ?)';
+            $params[] = $user['area_id'];
+        } elseif (in_array($role, ['zm', 'dzm', 'tm'], true) && !empty($user['zone_id'])) {
+            $clientFilter = 'c.branch_id IN (SELECT id FROM branches WHERE zone_id = ? OR area_id IN (SELECT id FROM areas WHERE zone_id = ?))';
+            $params[] = $user['zone_id'];
+            $params[] = $user['zone_id'];
+        }
+        try {
+            $s = $pdo->prepare("SELECT COUNT(*) FROM clients c WHERE (c.deleted_at IS NULL OR c.deleted_at = '') AND $clientFilter");
+            $s->execute($params);
+            $clients_count = (int)$s->fetchColumn();
+        } catch (Throwable $e) {}
+        try {
+            $s = $pdo->prepare("SELECT COALESCE(SUM(sc.amount),0) FROM saving_collections sc JOIN clients c ON sc.client_id=c.id
+                WHERE CAST(sc.date AS DATE) BETWEEN ? AND ? AND $clientFilter
+                AND sc.amount > 0 AND LOWER(COALESCE(sc.type,'')) NOT IN ('withdrawal','return','adjust')");
+            $s->execute(array_merge([$monthStart, $today], $params));
+            $monthly_savings = (float)$s->fetchColumn();
+        } catch (Throwable $e) {}
+        try {
+            $s = $pdo->prepare("SELECT COALESCE(SUM(d.principal),0) FROM disbursements d JOIN clients c ON d.client_id=c.id
+                WHERE DATE_FORMAT(d.date,'%Y-%m') = ? AND $clientFilter");
+            $s->execute(array_merge([$currentMonth], $params));
+            $monthly_disbursed = (float)$s->fetchColumn();
+        } catch (Throwable $e) {}
+        try {
+            $s = $pdo->prepare("SELECT COUNT(DISTINCT d.client_id) FROM disbursements d JOIN clients c ON d.client_id=c.id
+                WHERE d.remaining_balance > 0 AND $clientFilter");
+            $s->execute($params);
+            $active_loans_count = (int)$s->fetchColumn();
+        } catch (Throwable $e) {}
+        try {
+            $s = $pdo->prepare("SELECT COALESCE(SUM(d.remaining_balance),0) FROM disbursements d JOIN clients c ON d.client_id=c.id
+                WHERE d.remaining_balance > 0 AND $clientFilter");
+            $s->execute($params);
+            $grand_loans = (float)$s->fetchColumn();
+        } catch (Throwable $e) {}
+        try {
+            $s = $pdo->prepare("SELECT COALESCE(SUM(amount_collected),0) FROM loan_collections lc JOIN clients c ON lc.client_id=c.id
+                WHERE CAST(lc.date AS DATE) = ? AND $clientFilter");
+            $s->execute(array_merge([$today], $params));
+            $collected_today = (float)$s->fetchColumn();
+        } catch (Throwable $e) {}
+        try {
+            $s = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN sc.amount > 0 AND LOWER(COALESCE(sc.type,'')) NOT IN ('withdrawal','return','adjust') THEN sc.amount ELSE 0 END),0)
+                FROM saving_collections sc JOIN clients c ON sc.client_id=c.id WHERE CAST(sc.date AS DATE)=? AND $clientFilter");
+            $s->execute(array_merge([$today], $params));
+            $savings_today = (float)$s->fetchColumn();
+        } catch (Throwable $e) {}
     }
 
-    $clientsCount = 0;
-    try {
-        $s = $pdo->prepare("SELECT COUNT(*) FROM clients c WHERE c.deleted_at IS NULL AND c.status = 'active' AND $clientFilter");
-        $s->execute($params);
-        $clientsCount = (int)$s->fetchColumn();
-    } catch (Throwable $e) { /* ignore */ }
-
-    $savingsToday = 0.0;
-    $collectedToday = 0.0;
-    $outstanding = 0.0;
-    $netSavingsMonth = 0.0;
-
-    try {
-        $sql = "SELECT COALESCE(SUM(CASE WHEN sc.amount > 0 AND LOWER(COALESCE(sc.type,'')) NOT IN ('withdrawal','return','adjust') THEN sc.amount ELSE 0 END),0)
-                FROM saving_collections sc
-                JOIN clients c ON sc.client_id = c.id
-                WHERE CAST(sc.date AS DATE) = ? AND $clientFilter";
-        $s = $pdo->prepare($sql);
-        $s->execute(array_merge([$today], $params));
-        $savingsToday = (float)$s->fetchColumn();
-    } catch (Throwable $e) { /* ignore */ }
-
-    try {
-        $sql = "SELECT COALESCE(SUM(lc.amount_collected),0)
-                FROM loan_collections lc
-                JOIN clients c ON lc.client_id = c.id
-                WHERE CAST(lc.date AS DATE) = ? AND $clientFilter";
-        $s = $pdo->prepare($sql);
-        $s->execute(array_merge([$today], $params));
-        $collectedToday = (float)$s->fetchColumn();
-    } catch (Throwable $e) { /* ignore */ }
-
-    try {
-        $sql = "SELECT COALESCE(SUM(d.remaining_balance),0)
-                FROM disbursements d
-                JOIN clients c ON d.client_id = c.id
-                WHERE d.remaining_balance > 0 AND $clientFilter";
-        $s = $pdo->prepare($sql);
-        $s->execute($params);
-        $outstanding = (float)$s->fetchColumn();
-    } catch (Throwable $e) { /* ignore */ }
-
-    try {
-        $sql = "SELECT COALESCE(SUM(CASE WHEN sc.amount < 0 OR LOWER(COALESCE(sc.type,'')) IN ('withdrawal','return','adjust') THEN -ABS(sc.amount) ELSE sc.amount END),0)
-                FROM saving_collections sc
-                JOIN clients c ON sc.client_id = c.id
-                WHERE CAST(sc.date AS DATE) BETWEEN ? AND ? AND $clientFilter";
-        $s = $pdo->prepare($sql);
-        $s->execute(array_merge([$monthStart, $today], $params));
-        $netSavingsMonth = (float)$s->fetchColumn();
-    } catch (Throwable $e) { /* ignore */ }
+    $grand_net = $grand_savings - $grand_loans;
 
     respond([
         'success' => true,
         'data' => [
-            'clients' => $clientsCount,
-            'savings_today' => $savingsToday,
-            'collected_today' => $collectedToday,
-            'outstanding' => $outstanding,
-            'net_savings_month' => $netSavingsMonth,
+            // CO PHP dashboard parity
+            'monthly_net_savings' => $monthly_savings,
+            'monthly_disbursed' => $monthly_disbursed,
+            'active_loans' => $active_loans_count,
+            'total_savings' => $grand_savings,
+            'total_loans_outstanding' => $grand_loans,
+            'portfolio_net' => $grand_net,
+            'clients' => $clients_count,
+            'savings_today' => $savings_today,
+            'collected_today' => $collected_today,
+            'collected_month' => $collected_month,
+            // aliases used by older mobile code
+            'net_savings_month' => $monthly_savings,
+            'outstanding' => $grand_loans,
+            // location
+            'branch_name' => $branch_name,
+            'area_name' => $area_name,
+            'zone_name' => $zone_name,
+            'unions' => $unions,
             'as_of' => date('c'),
         ],
     ]);

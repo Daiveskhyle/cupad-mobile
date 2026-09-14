@@ -129,13 +129,7 @@ class ApiClient {
   }
 
   // ---------- Dashboard ----------
-  async getDashboardStats(): Promise<{
-    clients: number;
-    savings_today: number;
-    collected_today: number;
-    outstanding: number;
-    net_savings_month: number;
-  } | null> {
+  async getDashboardStats(): Promise<any | null> {
     try {
       const { data } = await this.client.get<{ success: boolean; data: any }>(
         '/dashboard/stats'

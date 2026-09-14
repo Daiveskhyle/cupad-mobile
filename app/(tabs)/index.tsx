@@ -57,44 +57,157 @@ export default function DashboardScreen() {
       </LinearGradient>
 
       {/* Scope info */}
-      {(user?.zone_id || user?.area_id || user?.branch_id) && (
+      {(stats?.branch_name || stats?.area_name || stats?.zone_name || user?.zone_id || user?.area_id || user?.branch_id) && (
         <View style={[styles.scopeCard, { backgroundColor: colors.card }]}>
           <Ionicons name="location-outline" size={18} color={colors.primary} />
           <View style={{ flex: 1, marginLeft: 10 }}>
-            {user?.zone_id ? (
-              <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Zone: {user.zone_id}</Text>
+            {(stats?.zone_name || user?.zone_id) ? (
+              <Text style={[styles.scopeText, { color: colors.textSecondary }]}>
+                Zone: {stats?.zone_name || user?.zone_id}
+              </Text>
             ) : null}
-            {user?.area_id ? (
-              <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Area: {user.area_id}</Text>
+            {(stats?.area_name || user?.area_id) ? (
+              <Text style={[styles.scopeText, { color: colors.textSecondary }]}>
+                Area: {stats?.area_name || user?.area_id}
+              </Text>
             ) : null}
-            {user?.branch_id ? (
-              <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Branch: {user.branch_id}</Text>
+            {(stats?.branch_name || user?.branch_id) ? (
+              <Text style={[styles.scopeText, { color: colors.textSecondary }]}>
+                Branch: {stats?.branch_name || user?.branch_id}
+              </Text>
             ) : null}
           </View>
         </View>
       )}
 
-      {/* Overview stats – role flavoured */}
-      {!isClient && (
+      {/* Overview stats – CO PHP dashboard parity */}
+      {!isClient && isField && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Overview</Text>
+          <View style={styles.summaryGrid}>
+            <LinearGradient colors={['#22C55E', '#16A34A']} style={styles.summaryCard}>
+              <Ionicons name="wallet-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Monthly Net Savings</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.monthly_net_savings ?? stats.net_savings_month ?? 0).toLocaleString() : '—'}
+              </Text>
+            </LinearGradient>
+            <LinearGradient colors={['#3B82F6', '#2563EB']} style={styles.summaryCard}>
+              <Ionicons name="cash-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Monthly Disbursed</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.monthly_disbursed ?? 0).toLocaleString() : '—'}
+              </Text>
+            </LinearGradient>
+          </View>
+          <View style={styles.summaryGrid}>
+            <LinearGradient colors={['#8B5CF6', '#7C3AED']} style={styles.summaryCard}>
+              <Ionicons name="document-text-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Active Loans</Text>
+              <Text style={styles.cardValue}>
+                {stats ? String(stats.active_loans ?? 0) : '—'}
+              </Text>
+            </LinearGradient>
+            <LinearGradient colors={['#F59E0B', '#D97706']} style={styles.summaryCard}>
+              <Ionicons name="people-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Active Clients</Text>
+              <Text style={styles.cardValue}>
+                {stats ? String(stats.clients ?? 0) : '—'}
+              </Text>
+            </LinearGradient>
+          </View>
+
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Portfolio</Text>
+          <View style={styles.summaryGrid}>
+            <LinearGradient colors={['#10B981', '#059669']} style={styles.summaryCard}>
+              <Ionicons name="piggy-bank-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Total Savings</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.total_savings ?? 0).toLocaleString() : '—'}
+              </Text>
+            </LinearGradient>
+            <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.summaryCard}>
+              <Ionicons name="alert-circle-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Outstanding Loans</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.total_loans_outstanding ?? stats.outstanding ?? 0).toLocaleString() : '—'}
+              </Text>
+            </LinearGradient>
+          </View>
+          <View style={styles.summaryGrid}>
+            <LinearGradient
+              colors={Number(stats?.portfolio_net ?? 0) >= 0 ? ['#06B6D4', '#0891B2'] : ['#F43F5E', '#E11D48']}
+              style={[styles.summaryCard, { flex: 1 }]}
+            >
+              <Ionicons name="trending-up-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Portfolio Net</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.portfolio_net ?? 0).toLocaleString() : '—'}
+              </Text>
+            </LinearGradient>
+            <LinearGradient colors={['#6366F1', '#4F46E5']} style={styles.summaryCard}>
+              <Ionicons name="today-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Today Savings</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.savings_today ?? 0).toLocaleString() : '—'}
+              </Text>
+            </LinearGradient>
+          </View>
+          <View style={styles.summaryGrid}>
+            <LinearGradient colors={['#A855F7', '#9333EA']} style={styles.summaryCard}>
+              <Ionicons name="card-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Today Loan Collect</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.collected_today ?? 0).toLocaleString() : '—'}
+              </Text>
+            </LinearGradient>
+            <LinearGradient colors={['#14B8A6', '#0D9488']} style={styles.summaryCard}>
+              <Ionicons name="calendar-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Month Loan Collect</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.collected_month ?? 0).toLocaleString() : '—'}
+              </Text>
+            </LinearGradient>
+          </View>
+
+          {/* Union performance */}
+          {Array.isArray(stats?.unions) && stats.unions.length > 0 && (
+            <>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Unions</Text>
+              {stats.unions.map((u: any) => (
+                <View key={u.name} style={[styles.unionCard, { backgroundColor: colors.card }]}>
+                  <Text style={[styles.unionName, { color: colors.text }]}>{u.name}</Text>
+                  <View style={styles.unionRow}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{u.clients} clients</Text>
+                    <Text style={{ color: '#16A34A', fontSize: 12, fontWeight: '600' }}>
+                      Sav ₦{Number(u.savings || 0).toLocaleString()}
+                    </Text>
+                    <Text style={{ color: '#DC2626', fontSize: 12, fontWeight: '600' }}>
+                      Loan ₦{Number(u.loans || 0).toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+        </>
+      )}
+
+      {/* Overview for managers / non-CO */}
+      {!isClient && !isField && (
         <>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Overview</Text>
           <View style={styles.summaryGrid}>
             <LinearGradient colors={['#4CAF50', '#45a049']} style={styles.summaryCard}>
               <Ionicons name="wallet-outline" size={20} color="#fff" style={styles.cardIcon} />
-              <Text style={styles.cardTitle}>
-                {isField ? 'Today Savings' : 'Net Savings'}
-              </Text>
+              <Text style={styles.cardTitle}>Net Savings</Text>
               <Text style={styles.cardValue}>
-                {stats
-                  ? '₦' + Number(isField ? stats.savings_today : stats.net_savings_month || 0).toLocaleString()
-                  : '—'}
+                {stats ? '₦' + Number(stats.monthly_net_savings ?? stats.net_savings_month ?? 0).toLocaleString() : '—'}
               </Text>
             </LinearGradient>
             <LinearGradient colors={['#2196F3', '#1e88e5']} style={styles.summaryCard}>
               <Ionicons name="cash-outline" size={20} color="#fff" style={styles.cardIcon} />
-              <Text style={styles.cardTitle}>
-                {isField ? 'Today Collections' : 'Collected'}
-              </Text>
+              <Text style={styles.cardTitle}>Collected Today</Text>
               <Text style={styles.cardValue}>
                 {stats ? '₦' + Number(stats.collected_today || 0).toLocaleString() : '—'}
               </Text>
@@ -112,7 +225,23 @@ export default function DashboardScreen() {
               <Ionicons name="alert-circle-outline" size={20} color="#fff" style={styles.cardIcon} />
               <Text style={styles.cardTitle}>Outstanding</Text>
               <Text style={styles.cardValue}>
-                {stats ? '₦' + Number(stats.outstanding || 0).toLocaleString() : '—'}
+                {stats ? '₦' + Number(stats.total_loans_outstanding ?? stats.outstanding ?? 0).toLocaleString() : '—'}
+              </Text>
+            </LinearGradient>
+          </View>
+          <View style={styles.summaryGrid}>
+            <LinearGradient colors={['#3B82F6', '#2563EB']} style={styles.summaryCard}>
+              <Ionicons name="cash-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Monthly Disbursed</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.monthly_disbursed ?? 0).toLocaleString() : '—'}
+              </Text>
+            </LinearGradient>
+            <LinearGradient colors={['#8B5CF6', '#7C3AED']} style={styles.summaryCard}>
+              <Ionicons name="document-text-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Active Loans</Text>
+              <Text style={styles.cardValue}>
+                {stats ? String(stats.active_loans ?? 0) : '—'}
               </Text>
             </LinearGradient>
           </View>
