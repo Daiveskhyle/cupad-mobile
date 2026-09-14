@@ -16,13 +16,15 @@ export default function DashboardScreen() {
     user?.full_name || user?.name || user?.username || 'User';
 
   const handleAction = (key: string) => {
-    // Route to existing screens where available
+    const meta = ACTION_META[key];
+    if (meta?.route) {
+      router.push(meta.route as any);
+      return;
+    }
     if (key === 'clients' || key === 'portfolio') {
       router.push('/(tabs)/search');
       return;
     }
-    // Placeholder for screens not yet built
-    // Future: router.push(`/screens/${key}`)
   };
 
   // Summary cards differ slightly by role
