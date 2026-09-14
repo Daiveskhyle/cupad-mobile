@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 12,
-    color: '#1E293B'Secondary,
+    color: '#64748B',
     marginBottom: 4,
   },
   summaryValue: {
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   },
   listLabel: {
     fontSize: 13,
-    color: '#1E293B'Secondary,
+    color: '#64748B',
   },
   listValue: {
     fontSize: 14,
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   txDate: {
     fontSize: 12,
-    color: '#1E293B'Secondary,
+    color: '#64748B',
     marginTop: 2,
   },
   txAmount: {
