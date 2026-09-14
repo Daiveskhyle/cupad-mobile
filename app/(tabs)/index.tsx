@@ -3,20 +3,36 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '../../src/store/auth';
 import { COLORS, SPACING, RADIUS } from '../../src/constants/config';
+import { getRoleConfig, ACTION_META } from '../../src/constants/roles';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
+  const roleCfg = getRoleConfig(user?.role);
 
   const displayName =
     user?.full_name || user?.name || user?.username || 'User';
-  const role = (user?.role || '').toUpperCase();
+
+  const handleAction = (key: string) => {
+    // Route to existing screens where available
+    if (key === 'clients' || key === 'portfolio') {
+      router.push('/(tabs)/search');
+      return;
+    }
+    // Placeholder for screens not yet built
+    // Future: router.push(`/screens/${key}`)
+  };
+
+  // Summary cards differ slightly by role
+  const isField = roleCfg.key === 'co';
+  const isManager = ['am', 'bm', 'zm', 'dzm', 'tm', 'admin'].includes(roleCfg.key);
+  const isClient = roleCfg.key === 'client';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Welcome header – gradient like web */}
+      {/* Welcome header */}
       <LinearGradient
-        colors={[COLORS.gradientStart, COLORS.gradientEnd]}
+        colors={[roleCfg.accent, COLORS.gradientEnd]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.welcomeCard}
@@ -24,78 +40,143 @@ export default function DashboardScreen() {
         <Text style={styles.greeting}>Welcome back,</Text>
         <Text style={styles.name}>{displayName}</Text>
         <View style={styles.roleBadge}>
-          <Text style={styles.roleText}>{role || 'STAFF'}</Text>
+          <Text style={styles.roleText}>{roleCfg.shortLabel}</Text>
         </View>
+        <Text style={styles.roleDesc}>{roleCfg.description}</Text>
       </LinearGradient>
 
-      {/* Summary-style cards matching web gradients */}
-      <Text style={styles.sectionTitle}>Overview</Text>
-      <View style={styles.summaryGrid}>
-        <LinearGradient colors={['#4CAF50', '#45a049']} style={styles.summaryCard}>
-          <Ionicons name="cash-outline" size={22} color="#fff" style={styles.cardIcon} />
-          <Text style={styles.cardTitle}>Savings</Text>
-          <Text style={styles.cardValue}>—</Text>
-        </LinearGradient>
-        <LinearGradient colors={['#2196F3', '#1e88e5']} style={styles.summaryCard}>
-          <Ionicons name="wallet-outline" size={22} color="#fff" style={styles.cardIcon} />
-          <Text style={styles.cardTitle}>Collected</Text>
-          <Text style={styles.cardValue}>—</Text>
-        </LinearGradient>
-      </View>
-      <View style={styles.summaryGrid}>
-        <LinearGradient colors={['#9C27B0', '#8e24aa']} style={styles.summaryCard}>
-          <Ionicons name="people-outline" size={22} color="#fff" style={styles.cardIcon} />
-          <Text style={styles.cardTitle}>Clients</Text>
-          <Text style={styles.cardValue}>—</Text>
-        </LinearGradient>
-        <LinearGradient colors={['#f44336', '#d32f2f']} style={styles.summaryCard}>
-          <Ionicons name="alert-circle-outline" size={22} color="#fff" style={styles.cardIcon} />
-          <Text style={styles.cardTitle}>Outstanding</Text>
-          <Text style={styles.cardValue}>—</Text>
-        </LinearGradient>
-      </View>
-
-      {/* Quick Actions */}
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      <View style={styles.actionsGrid}>
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => router.push('/(tabs)/search')}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.iconCircle, { backgroundColor: 'rgba(59,130,246,0.12)' }]}>
-            <Ionicons name="search" size={24} color={COLORS.primary} />
+      {/* Scope info */}
+      {(user?.zone_id || user?.area_id || user?.branch_id) && (
+        <View style={styles.scopeCard}>
+          <Ionicons name="location-outline" size={18} color={COLORS.primary} />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            {user?.zone_id ? (
+              <Text style={styles.scopeText}>Zone: {user.zone_id}</Text>
+            ) : null}
+            {user?.area_id ? (
+              <Text style={styles.scopeText}>Area: {user.area_id}</Text>
+            ) : null}
+            {user?.branch_id ? (
+              <Text style={styles.scopeText}>Branch: {user.branch_id}</Text>
+            ) : null}
           </View>
-          <Text style={styles.actionLabel}>Search Clients</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => router.push('/(tabs)/profile')}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.iconCircle, { backgroundColor: 'rgba(168,85,247,0.12)' }]}>
-            <Ionicons name="person" size={24} color={COLORS.secondary} />
-          </View>
-          <Text style={styles.actionLabel}>My Profile</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.infoCard}>
-        <Ionicons name="information-circle" size={22} color={COLORS.primary} />
-        <Text style={styles.infoText}>
-          Use Search to find clients and view their savings, loans, and transaction history.
-        </Text>
-      </View>
-
-      {(user?.branch_id || user?.zone_id) && (
-        <View style={styles.metaCard}>
-          <Text style={styles.metaTitle}>Your Assignment</Text>
-          {user?.zone_id && <Text style={styles.metaItem}>Zone: {user.zone_id}</Text>}
-          {user?.area_id && <Text style={styles.metaItem}>Area: {user.area_id}</Text>}
-          {user?.branch_id && <Text style={styles.metaItem}>Branch: {user.branch_id}</Text>}
         </View>
       )}
+
+      {/* Overview stats – role flavoured */}
+      {!isClient && (
+        <>
+          <Text style={styles.sectionTitle}>Overview</Text>
+          <View style={styles.summaryGrid}>
+            <LinearGradient colors={['#4CAF50', '#45a049']} style={styles.summaryCard}>
+              <Ionicons name="wallet-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>
+                {isField ? 'Today Savings' : 'Net Savings'}
+              </Text>
+              <Text style={styles.cardValue}>—</Text>
+            </LinearGradient>
+            <LinearGradient colors={['#2196F3', '#1e88e5']} style={styles.summaryCard}>
+              <Ionicons name="cash-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>
+                {isField ? 'Today Collections' : 'Collected'}
+              </Text>
+              <Text style={styles.cardValue}>—</Text>
+            </LinearGradient>
+          </View>
+          <View style={styles.summaryGrid}>
+            <LinearGradient colors={['#9C27B0', '#8e24aa']} style={styles.summaryCard}>
+              <Ionicons name="people-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Clients</Text>
+              <Text style={styles.cardValue}>—</Text>
+            </LinearGradient>
+            <LinearGradient colors={['#f44336', '#d32f2f']} style={styles.summaryCard}>
+              <Ionicons name="alert-circle-outline" size={20} color="#fff" style={styles.cardIcon} />
+              <Text style={styles.cardTitle}>Outstanding</Text>
+              <Text style={styles.cardValue}>—</Text>
+            </LinearGradient>
+          </View>
+        </>
+      )}
+
+      {isClient && (
+        <>
+          <Text style={styles.sectionTitle}>My Portfolio</Text>
+          <View style={styles.summaryGrid}>
+            <LinearGradient colors={['#4CAF50', '#45a049']} style={styles.summaryCard}>
+              <Text style={styles.cardTitle}>Savings</Text>
+              <Text style={styles.cardValue}>—</Text>
+            </LinearGradient>
+            <LinearGradient colors={['#f44336', '#d32f2f']} style={styles.summaryCard}>
+              <Text style={styles.cardTitle}>Loan Balance</Text>
+              <Text style={styles.cardValue}>—</Text>
+            </LinearGradient>
+          </View>
+        </>
+      )}
+
+      {/* Role-specific quick actions */}
+      <Text style={styles.sectionTitle}>
+        {isField ? 'Field Actions' : isManager ? 'Management' : 'Quick Actions'}
+      </Text>
+      <View style={styles.actionsGrid}>
+        {roleCfg.actions.map((key) => {
+          const meta = ACTION_META[key];
+          if (!meta) return null;
+          return (
+            <TouchableOpacity
+              key={key}
+              style={styles.actionCard}
+              onPress={() => handleAction(key)}
+              activeOpacity={0.8}
+            >
+              <View
+                style={[
+                  styles.iconCircle,
+                  { backgroundColor: meta.color + '18' },
+                ]}
+              >
+                <Ionicons
+                  name={meta.icon as any}
+                  size={22}
+                  color={meta.color}
+                />
+              </View>
+              <Text style={styles.actionLabel}>{meta.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Always show search for non-clients */}
+      {!isClient && (
+        <TouchableOpacity
+          style={styles.searchBanner}
+          onPress={() => router.push('/(tabs)/search')}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={[COLORS.gradientStart, COLORS.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.searchBannerInner}
+          >
+            <Ionicons name="search" size={22} color="#fff" />
+            <Text style={styles.searchBannerText}>Search Clients</Text>
+            <Ionicons name="chevron-forward" size={20} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.infoCard}>
+        <Ionicons name="information-circle" size={20} color={COLORS.primary} />
+        <Text style={styles.infoText}>
+          You are signed in as <Text style={{ fontWeight: '700' }}>{roleCfg.label}</Text>
+          {roleCfg.scope !== 'system' && roleCfg.scope !== 'self'
+            ? ` (${roleCfg.scope}-level access)`
+            : ''}
+          . More screens for this role are coming soon.
+        </Text>
+      </View>
     </ScrollView>
   );
 }
@@ -107,12 +188,12 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.md,
-    paddingBottom: 40,
+    paddingBottom: 48,
   },
   welcomeCard: {
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   greeting: {
     color: 'rgba(255,255,255,0.85)',
@@ -120,7 +201,7 @@ const styles = StyleSheet.create({
   },
   name: {
     color: COLORS.white,
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
     marginTop: 4,
   },
@@ -130,12 +211,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: RADIUS.full,
-    marginTop: 12,
+    marginTop: 10,
   },
   roleText: {
     color: COLORS.white,
     fontSize: 12,
     fontWeight: '700',
+  },
+  roleDesc: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    marginTop: 8,
+  },
+  scopeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    padding: 12,
+    marginBottom: SPACING.md,
+  },
+  scopeText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
   },
   sectionTitle: {
     fontSize: 16,
@@ -152,13 +250,13 @@ const styles = StyleSheet.create({
   summaryCard: {
     flex: 1,
     borderRadius: RADIUS.md,
-    padding: 16,
-    minHeight: 100,
+    padding: 14,
+    minHeight: 90,
   },
   cardIcon: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 10,
+    right: 10,
     opacity: 0.9,
   },
   cardTitle: {
@@ -169,39 +267,60 @@ const styles = StyleSheet.create({
   },
   cardValue: {
     color: COLORS.white,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
   },
   actionsGrid: {
     flexDirection: 'row',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: 10,
     marginBottom: SPACING.lg,
   },
   actionCard: {
-    flex: 1,
+    width: '30%',
+    flexGrow: 1,
+    maxWidth: '32%',
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.md,
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   actionLabel: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
     color: COLORS.text,
     textAlign: 'center',
+  },
+  searchBanner: {
+    marginBottom: SPACING.lg,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+  },
+  searchBannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  searchBannerText: {
+    flex: 1,
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
   infoCard: {
     flexDirection: 'row',
@@ -209,32 +328,11 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     padding: 14,
     gap: 10,
-    marginBottom: SPACING.lg,
   },
   infoText: {
     flex: 1,
     fontSize: 13,
     color: COLORS.primaryDark,
     lineHeight: 18,
-  },
-  metaCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  metaTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 8,
-  },
-  metaItem: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
   },
 });

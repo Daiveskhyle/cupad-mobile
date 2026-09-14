@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../src/store/auth';
+import { getRoleConfig } from '../../src/constants/roles';
 import { COLORS, SPACING } from '../../src/constants/config';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -23,6 +24,7 @@ export default function ProfileScreen() {
 
   const displayName =
     user?.full_name || user?.name || user?.username || 'User';
+  const roleCfg = getRoleConfig(user?.role);
 
   return (
     <View style={styles.container}>
@@ -33,7 +35,7 @@ export default function ProfileScreen() {
           </Text>
         </View>
         <Text style={styles.name}>{displayName}</Text>
-        <Text style={styles.role}>{(user?.role || 'staff').toUpperCase()}</Text>
+        <Text style={styles.role}>{roleCfg.label}</Text>
       </View>
 
       <View style={styles.card}>

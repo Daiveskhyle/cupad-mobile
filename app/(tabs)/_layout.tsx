@@ -1,12 +1,17 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../src/constants/config';
+import { useAuthStore } from '../../src/store/auth';
+import { getRoleConfig } from '../../src/constants/roles';
 
 export default function TabsLayout() {
+  const user = useAuthStore((s) => s.user);
+  const roleCfg = getRoleConfig(user?.role);
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: COLORS.primary,
+        tabBarActiveTintColor: roleCfg.accent || COLORS.primary,
         tabBarInactiveTintColor: '#94A3B8',
         tabBarStyle: {
           backgroundColor: COLORS.white,
@@ -16,7 +21,7 @@ export default function TabsLayout() {
           paddingTop: 6,
         },
         headerStyle: {
-          backgroundColor: COLORS.primary,
+          backgroundColor: roleCfg.accent || COLORS.primary,
         },
         headerTintColor: COLORS.white,
         headerTitleStyle: { fontWeight: '700' },
@@ -25,7 +30,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: `${roleCfg.shortLabel} Dashboard`,
+          tabBarLabel: 'Home',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
@@ -34,10 +40,11 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Search',
+          title: 'Search Clients',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="search" size={size} color={color} />
           ),
+          // Hide search tab for pure client role if desired – keep for now
         }}
       />
       <Tabs.Screen
