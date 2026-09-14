@@ -10,7 +10,7 @@ import {
   cacheActivities,
   getActivitiesLocal,
   enqueueOp,
-} from '../db/sqlite';
+} from '../db';
 
 const STATS_KEY = 'dashboard_stats';
 
