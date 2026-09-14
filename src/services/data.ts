@@ -1,20 +1,12 @@
 /**
- * Online-first data service with SQLite offline fallback.
+ * Online-only data service.
+ *
+ * Local SQLite/offline persistence has been removed. All data is read from
+ * and written to the CUPAD API.
  */
 import { api } from '../api/client';
-import {
-  kvGet,
-  kvSet,
-  cacheClients,
-  searchClientsLocal,
-  cacheActivities,
-  getActivitiesLocal,
-  enqueueOp,
-} from '../db';
 
-const STATS_KEY = 'dashboard_stats';
-
-export type StatsSource = 'network' | 'cache' | 'none';
+export type StatsSource = 'network' | 'none';
 
 function emptyStats() {
   return {
@@ -41,28 +33,14 @@ export async function loadDashboardStats(): Promise<{
 }> {
   try {
     const data = await api.getDashboardStats();
-    if (data) {
-      await kvSet(STATS_KEY, data);
-      return { data, source: 'network' };
-    }
-    const cached = await kvGet(STATS_KEY);
-    if (cached) {
-      return {
-        data: cached,
-        source: 'cache',
-        error: 'Server still on API v1.1 — showing offline cache. Deploy server-api/v1-index.php',
-      };
-    }
+    if (data) return { data, source: 'network' };
+
     return {
       data: emptyStats(),
       source: 'none',
-      error: 'No stats. Deploy API v1.2 (server-api/v1-index.php → api/v1/index.php)',
+      error: 'No dashboard statistics returned by the API.',
     };
   } catch (e: any) {
-    const cached = await kvGet(STATS_KEY);
-    if (cached) {
-      return { data: cached, source: 'cache', error: 'Offline — cached stats' };
-    }
     return {
       data: emptyStats(),
       source: 'none',
@@ -78,24 +56,11 @@ export async function loadActivities(limit = 40): Promise<{
 }> {
   try {
     const data = await api.getActivities(limit);
-    if (data && data.length) {
-      await cacheActivities(data);
-      return { data, source: 'network' };
-    }
-    const cached = await getActivitiesLocal(limit);
-    if (cached.length) {
-      return { data: cached, source: 'cache', error: 'Showing offline activity' };
-    }
     return {
-      data: [],
-      source: 'none',
-      error: 'No activity yet (or API v1.2 not deployed)',
+      data: Array.isArray(data) ? data : [],
+      source: 'network',
     };
   } catch (e: any) {
-    const cached = await getActivitiesLocal(limit);
-    if (cached.length) {
-      return { data: cached, source: 'cache', error: 'Offline — cached activity' };
-    }
     return {
       data: [],
       source: 'none',
@@ -111,17 +76,11 @@ export async function searchClients(q: string, limit = 30): Promise<{
 }> {
   try {
     const res = await api.getClients({ q, limit });
-    const list = res.data || [];
-    if (list.length) await cacheClients(list);
-    if (list.length) return { data: list, source: 'network' };
-    const local = await searchClientsLocal(q, limit);
-    if (local.length) return { data: local, source: 'cache' };
-    return { data: [], source: 'network' };
+    return {
+      data: Array.isArray(res?.data) ? res.data : [],
+      source: 'network',
+    };
   } catch (e: any) {
-    const local = await searchClientsLocal(q, limit);
-    if (local.length) {
-      return { data: local, source: 'cache', error: 'Offline — local clients' };
-    }
     return {
       data: [],
       source: 'none',
@@ -135,80 +94,31 @@ export async function collectSavingsOnlineOrQueue(payload: {
   amount: number;
   notes?: string;
 }) {
-  try {
-    const res = await api.collectSavings(payload);
-    if (res?.success) return { ...res, queued: false };
-    throw new Error(res?.error || 'Failed');
-  } catch (e: any) {
-    const status = e?.response?.status;
-    if (!status || status >= 500 || status === 404) {
-      await enqueueOp('savings_collect', payload);
-      return {
-        success: true,
-        queued: true,
-        message: 'Saved offline. Will sync when API is available.',
-      };
-    }
-    throw e;
-  }
+  const res = await api.collectSavings(payload);
+  if (res?.success) return { ...res, queued: false };
+  throw new Error(res?.error || 'Failed to collect savings');
 }
 
 export async function withdrawOnlineOrQueue(payload: any) {
-  try {
-    const res = await api.withdrawSavings(payload);
-    if (res?.success) return { ...res, queued: false };
-    throw new Error(res?.error || 'Failed');
-  } catch (e: any) {
-    const status = e?.response?.status;
-    if (!status || status >= 500 || status === 404) {
-      await enqueueOp('savings_withdraw', payload);
-      return { success: true, queued: true, message: 'Saved offline. Will sync later.' };
-    }
-    throw e;
-  }
+  const res = await api.withdrawSavings(payload);
+  if (res?.success) return { ...res, queued: false };
+  throw new Error(res?.error || 'Failed to withdraw savings');
 }
 
 export async function collectLoanOnlineOrQueue(payload: any) {
-  try {
-    const res = await api.collectLoan(payload);
-    if (res?.success) return { ...res, queued: false };
-    throw new Error(res?.error || 'Failed');
-  } catch (e: any) {
-    const status = e?.response?.status;
-    if (!status || status >= 500 || status === 404) {
-      await enqueueOp('loan_collect', payload);
-      return { success: true, queued: true, message: 'Saved offline. Will sync later.' };
-    }
-    throw e;
-  }
+  const res = await api.collectLoan(payload);
+  if (res?.success) return { ...res, queued: false };
+  throw new Error(res?.error || 'Failed to collect loan payment');
 }
 
 export async function disburseOnlineOrQueue(payload: any) {
-  try {
-    const res = await api.disburseLoan(payload);
-    if (res?.success) return { ...res, queued: false };
-    throw new Error(res?.error || 'Failed');
-  } catch (e: any) {
-    const status = e?.response?.status;
-    if (!status || status >= 500 || status === 404) {
-      await enqueueOp('loan_disburse', payload);
-      return { success: true, queued: true, message: 'Saved offline. Will sync later.' };
-    }
-    throw e;
-  }
+  const res = await api.disburseLoan(payload);
+  if (res?.success) return { ...res, queued: false };
+  throw new Error(res?.error || 'Failed to disburse loan');
 }
 
 export async function registerOnlineOrQueue(payload: any) {
-  try {
-    const res = await api.registerClient(payload);
-    if (res?.success) return { ...res, queued: false };
-    throw new Error(res?.error || 'Failed');
-  } catch (e: any) {
-    const status = e?.response?.status;
-    if (!status || status >= 500 || status === 404) {
-      await enqueueOp('client_register', payload);
-      return { success: true, queued: true, message: 'Saved offline. Will sync later.' };
-    }
-    throw e;
-  }
+  const res = await api.registerClient(payload);
+  if (res?.success) return { ...res, queued: false };
+  throw new Error(res?.error || 'Failed to register client');
 }
