@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import { storageGet, storageSet, storageDelete } from '../utils/storage';
 import { API_BASE_URL } from '../constants/config';
 import type {
   LoginResponse,
@@ -29,7 +29,7 @@ class ApiClient {
 
     // Attach JWT automatically
     this.client.interceptors.request.use(async (config) => {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      const token = await storageGet(TOKEN_KEY);
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -49,15 +49,15 @@ class ApiClient {
   }
 
   async setToken(token: string) {
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
+    await storageSet(TOKEN_KEY, token);
   }
 
   async getToken(): Promise<string | null> {
-    return SecureStore.getItemAsync(TOKEN_KEY);
+    return storageGet(TOKEN_KEY);
   }
 
   async clearToken() {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await storageDelete(TOKEN_KEY);
   }
 
   // ---------- Auth ----------

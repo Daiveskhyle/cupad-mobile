@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
 import { lightColors, darkColors, type ThemeColors } from '../constants/config';
+import { storageGet, storageSet } from '../utils/storage';
 
 const THEME_KEY = 'cupad_theme';
 
@@ -22,7 +22,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   loadTheme: async () => {
     try {
-      const saved = await SecureStore.getItemAsync(THEME_KEY);
+      const saved = await storageGet(THEME_KEY);
       const mode: ThemeMode = saved === 'dark' ? 'dark' : 'light';
       set({
         mode,
@@ -35,11 +35,11 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   },
 
   setMode: async (mode) => {
-    await SecureStore.setItemAsync(THEME_KEY, mode);
     set({
       mode,
       colors: mode === 'dark' ? darkColors : lightColors,
     });
+    await storageSet(THEME_KEY, mode);
   },
 
   toggle: async () => {
