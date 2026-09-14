@@ -61,7 +61,7 @@ export default function ClientPortfolioScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.accent} />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
@@ -87,7 +87,7 @@ export default function ClientPortfolioScreen() {
             setRefreshing(true);
             load();
           }}
-          colors={[COLORS.accent]}
+          colors={[COLORS.primary]}
         />
       }
     >
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
