@@ -23,14 +23,22 @@ export default function SavingsWithdrawalScreen() {
     if (!value || value <= 0) return Alert.alert('Required', 'Enter a valid amount');
     setLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      Alert.alert(
-        'Withdrawal recorded (local)',
-        `₦${value.toLocaleString()} withdrawal for ${client.name}.\n\nServer sync pending write API.`,
-        [{ text: 'OK', onPress: () => { setAmount(''); setReason(''); } }]
-      );
+      const { api } = await import('../../src/api/client');
+      const res = await api.withdrawSavings({
+        client_id: client.id,
+        amount: value,
+        reason: reason || undefined,
+        notes: reason || undefined,
+      });
+      if (res?.success) {
+        Alert.alert('Success', res.message || 'Withdrawal recorded', [
+          { text: 'OK', onPress: () => { setAmount(''); setReason(''); } },
+        ]);
+      } else {
+        Alert.alert('Error', res?.error || 'Failed');
+      }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed');
+      Alert.alert('Error', e?.response?.data?.error || e?.message || 'Failed. Deploy API v1.2?');
     } finally {
       setLoading(false);
     }

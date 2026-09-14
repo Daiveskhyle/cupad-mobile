@@ -23,19 +23,28 @@ export default function RegisterClientScreen() {
     if (!phone.trim()) return Alert.alert('Required', 'Enter phone number');
     setLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      Alert.alert(
-        'Client registered (local)',
-        `${name}\n${phone}\nType: ${clientType}\n\nServer sync pending write API.`,
-        [{
+      const { api } = await import('../../src/api/client');
+      const fee = parseFloat(regFee.replace(/,/g, '')) || 0;
+      const res = await api.registerClient({
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim() || undefined,
+        address: address.trim() || undefined,
+        client_type: clientType,
+        registration_fee: fee || undefined,
+      });
+      if (res?.success) {
+        Alert.alert('Success', `Client registered. ID: ${res.client_id || '—'}`, [{
           text: 'OK',
           onPress: () => {
             setName(''); setPhone(''); setEmail(''); setAddress(''); setRegFee('');
           },
-        }]
-      );
+        }]);
+      } else {
+        Alert.alert('Error', res?.error || 'Failed');
+      }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed');
+      Alert.alert('Error', e?.response?.data?.error || e?.message || 'Failed. Deploy API v1.2?');
     } finally {
       setLoading(false);
     }

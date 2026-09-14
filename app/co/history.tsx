@@ -1,12 +1,10 @@
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { useThemeStore } from '../../src/store/theme';
+import { api } from '../../src/api/client';
 import { SPACING, RADIUS } from '../../src/constants/config';
-
-const SAMPLE = [
-  { id: '1', type: 'Saving', client: 'Sample Client', amount: 5000, date: 'Today' },
-  { id: '2', type: 'Payment', client: 'Sample Client', amount: 12000, date: 'Yesterday' },
-];
 
 const typeColor: Record<string, string> = {
   Saving: '#22C55E',
@@ -18,36 +16,64 @@ const typeColor: Record<string, string> = {
 
 export default function CoHistoryScreen() {
   const colors = useThemeStore((s) => s.colors);
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = async () => {
+    try {
+      const data = await api.getActivities(40);
+      setItems(data);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [])
+  );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.info, { backgroundColor: colors.infoBg }]}>
-        <Ionicons name="information-circle" size={18} color={colors.primary} />
-        <Text style={{ flex: 1, color: colors.primaryDark, fontSize: 13, marginLeft: 8 }}>
-          Your recent field activity will appear here once the history API is connected.
-        </Text>
-      </View>
-
       <FlatList
-        data={SAMPLE}
-        keyExtractor={(i) => i.id}
-        contentContainerStyle={{ padding: SPACING.md }}
+        data={items}
+        keyExtractor={(i, idx) => String(i.transaction_id || idx)}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />
+        }
+        contentContainerStyle={{ padding: SPACING.md, flexGrow: 1 }}
         ListEmptyComponent={
-          <Text style={{ textAlign: 'center', color: colors.textSecondary, marginTop: 40 }}>
-            No activity yet
-          </Text>
+          <View style={{ alignItems: 'center', marginTop: 60 }}>
+            <Ionicons name="time-outline" size={48} color={colors.textMuted} />
+            <Text style={{ color: colors.textSecondary, marginTop: 12, textAlign: 'center' }}>
+              No activity yet.{'\n'}Collect savings or loans to see history here.
+            </Text>
+          </View>
         }
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={[styles.dot, { backgroundColor: typeColor[item.type] || colors.primary }]} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.client, { color: colors.text }]}>{item.client}</Text>
+              <Text style={[styles.client, { color: colors.text }]}>{item.client_name || '—'}</Text>
               <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                {item.type} · {item.date}
+                {item.type} · {item.date ? String(item.date).slice(0, 16) : ''}
               </Text>
             </View>
             <Text style={{ fontWeight: '700', color: typeColor[item.type] || colors.text }}>
-              ₦{item.amount.toLocaleString()}
+              ₦{Number(item.amount || 0).toLocaleString()}
             </Text>
           </View>
         )}
@@ -58,13 +84,6 @@ export default function CoHistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  info: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: SPACING.md,
-    padding: 12,
-    borderRadius: RADIUS.md,
-  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -6,11 +6,18 @@ import { useThemeStore } from '../../src/store/theme';
 import { SPACING, RADIUS } from '../../src/constants/config';
 import { getRoleConfig, ACTION_META } from '../../src/constants/roles';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import { api } from '../../src/api/client';
 
 export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
   const roleCfg = getRoleConfig(user?.role);
   const colors = useThemeStore((s) => s.colors);
+  const [stats, setStats] = useState<any>(null);
+
+  useEffect(() => {
+    api.getDashboardStats().then(setStats).catch(() => {});
+  }, []);
 
   const displayName =
     user?.full_name || user?.name || user?.username || 'User';
@@ -77,26 +84,36 @@ export default function DashboardScreen() {
               <Text style={styles.cardTitle}>
                 {isField ? 'Today Savings' : 'Net Savings'}
               </Text>
-              <Text style={styles.cardValue}>—</Text>
+              <Text style={styles.cardValue}>
+                {stats
+                  ? '₦' + Number(isField ? stats.savings_today : stats.net_savings_month || 0).toLocaleString()
+                  : '—'}
+              </Text>
             </LinearGradient>
             <LinearGradient colors={['#2196F3', '#1e88e5']} style={styles.summaryCard}>
               <Ionicons name="cash-outline" size={20} color="#fff" style={styles.cardIcon} />
               <Text style={styles.cardTitle}>
                 {isField ? 'Today Collections' : 'Collected'}
               </Text>
-              <Text style={styles.cardValue}>—</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.collected_today || 0).toLocaleString() : '—'}
+              </Text>
             </LinearGradient>
           </View>
           <View style={styles.summaryGrid}>
             <LinearGradient colors={['#9C27B0', '#8e24aa']} style={styles.summaryCard}>
               <Ionicons name="people-outline" size={20} color="#fff" style={styles.cardIcon} />
               <Text style={styles.cardTitle}>Clients</Text>
-              <Text style={styles.cardValue}>—</Text>
+              <Text style={styles.cardValue}>
+                {stats ? String(stats.clients ?? '—') : '—'}
+              </Text>
             </LinearGradient>
             <LinearGradient colors={['#f44336', '#d32f2f']} style={styles.summaryCard}>
               <Ionicons name="alert-circle-outline" size={20} color="#fff" style={styles.cardIcon} />
               <Text style={styles.cardTitle}>Outstanding</Text>
-              <Text style={styles.cardValue}>—</Text>
+              <Text style={styles.cardValue}>
+                {stats ? '₦' + Number(stats.outstanding || 0).toLocaleString() : '—'}
+              </Text>
             </LinearGradient>
           </View>
         </>

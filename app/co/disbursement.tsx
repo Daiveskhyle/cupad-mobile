@@ -28,14 +28,25 @@ export default function DisbursementScreen() {
     const total = p * (1 + rate / 100);
     setLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      Alert.alert(
-        'Disbursement recorded (local)',
-        `Client: ${client.name}\nPrincipal: ₦${p.toLocaleString()}\nInterest: ${rate}%\nTotal payable: ₦${total.toLocaleString()}\n${n} ${termType} installments\n\nServer sync pending write API.`,
-        [{ text: 'OK', onPress: () => { setPrincipal(''); } }]
-      );
+      const { api } = await import('../../src/api/client');
+      const res = await api.disburseLoan({
+        client_id: client.id,
+        principal: p,
+        interest_rate: rate,
+        num_installments: n,
+        loan_term_type: termType,
+      });
+      if (res?.success) {
+        Alert.alert(
+          'Success',
+          res.message || `Loan disbursed. Total payable ₦${Number(res.total_payable || total).toLocaleString()}`,
+          [{ text: 'OK', onPress: () => { setPrincipal(''); } }]
+        );
+      } else {
+        Alert.alert('Error', res?.error || 'Failed');
+      }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed');
+      Alert.alert('Error', e?.response?.data?.error || e?.message || 'Failed. Deploy API v1.2?');
     } finally {
       setLoading(false);
     }

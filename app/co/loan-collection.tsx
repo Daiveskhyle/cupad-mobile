@@ -23,14 +23,21 @@ export default function LoanCollectionScreen() {
     if (!value || value <= 0) return Alert.alert('Required', 'Enter a valid amount');
     setLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      Alert.alert(
-        'Payment recorded (local)',
-        `Loan payment of ₦${value.toLocaleString()} for ${client.name}.\n\nServer sync pending write API.`,
-        [{ text: 'OK', onPress: () => { setAmount(''); setNotes(''); } }]
-      );
+      const { api } = await import('../../src/api/client');
+      const res = await api.collectLoan({
+        client_id: client.id,
+        amount: value,
+        notes: notes || undefined,
+      });
+      if (res?.success) {
+        Alert.alert('Success', res.message || 'Loan payment recorded', [
+          { text: 'OK', onPress: () => { setAmount(''); setNotes(''); } },
+        ]);
+      } else {
+        Alert.alert('Error', res?.error || 'Failed');
+      }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed');
+      Alert.alert('Error', e?.response?.data?.error || e?.message || 'Failed. Deploy API v1.2?');
     } finally {
       setLoading(false);
     }

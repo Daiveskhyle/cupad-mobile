@@ -23,15 +23,22 @@ export default function SavingsCollectionScreen() {
     if (!value || value <= 0) return Alert.alert('Required', 'Enter a valid amount');
     setLoading(true);
     try {
-      // API write endpoint pending – UI ready
-      await new Promise((r) => setTimeout(r, 600));
-      Alert.alert(
-        'Saved (local)',
-        `Savings of ₦${value.toLocaleString()} for ${client.name} recorded on device.\n\nServer sync will activate when the write API is enabled.`,
-        [{ text: 'OK', onPress: () => { setAmount(''); setNotes(''); } }]
-      );
+      const { api } = await import('../../src/api/client');
+      const res = await api.collectSavings({
+        client_id: client.id,
+        amount: value,
+        notes: notes || undefined,
+      });
+      if (res?.success) {
+        Alert.alert('Success', res.message || `Savings of ₦${value.toLocaleString()} recorded.`, [
+          { text: 'OK', onPress: () => { setAmount(''); setNotes(''); } },
+        ]);
+      } else {
+        Alert.alert('Error', res?.error || 'Failed to save');
+      }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to save');
+      const msg = e?.response?.data?.error || e?.message || 'Failed to save. Is API v1.2 deployed?';
+      Alert.alert('Error', msg);
     } finally {
       setLoading(false);
     }
