@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     marginTop: 12,
-    color: '#1E293B'Secondary,
+    color: '#64748B',
     fontSize: 15,
   },
   card: {
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   },
   clientMeta: {
     fontSize: 13,
-    color: '#1E293B'Secondary,
+    color: '#64748B',
     marginTop: 2,
   },
   status: {
