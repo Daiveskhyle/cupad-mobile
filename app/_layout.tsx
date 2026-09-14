@@ -2,24 +2,28 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../src/store/auth';
-import { COLORS } from '../src/constants/config';
+import { useThemeStore } from '../src/store/theme';
 
 export default function RootLayout() {
   const loadUser = useAuthStore((s) => s.loadUser);
+  const loadTheme = useThemeStore((s) => s.loadTheme);
+  const colors = useThemeStore((s) => s.colors);
+  const mode = useThemeStore((s) => s.mode);
 
   useEffect(() => {
+    loadTheme();
     loadUser();
   }, []);
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: COLORS.primary },
-          headerTintColor: COLORS.white,
+          headerStyle: { backgroundColor: colors.primary },
+          headerTintColor: colors.white,
           headerTitleStyle: { fontWeight: '700' },
-          contentStyle: { backgroundColor: COLORS.background },
+          contentStyle: { backgroundColor: colors.background },
         }}
       >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />

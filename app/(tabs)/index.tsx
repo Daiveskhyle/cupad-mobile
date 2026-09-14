@@ -2,13 +2,15 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '../../src/store/auth';
-import { COLORS, SPACING, RADIUS } from '../../src/constants/config';
+import { useThemeStore } from '../../src/store/theme';
+import { SPACING, RADIUS } from '../../src/constants/config';
 import { getRoleConfig, ACTION_META } from '../../src/constants/roles';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
   const roleCfg = getRoleConfig(user?.role);
+  const colors = useThemeStore((s) => s.colors);
 
   const displayName =
     user?.full_name || user?.name || user?.username || 'User';
@@ -29,10 +31,10 @@ export default function DashboardScreen() {
   const isClient = roleCfg.key === 'client';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
       {/* Welcome header */}
       <LinearGradient
-        colors={[roleCfg.accent, COLORS.gradientEnd]}
+        colors={[roleCfg.accent, colors.gradientEnd]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.welcomeCard}
@@ -47,17 +49,17 @@ export default function DashboardScreen() {
 
       {/* Scope info */}
       {(user?.zone_id || user?.area_id || user?.branch_id) && (
-        <View style={styles.scopeCard}>
-          <Ionicons name="location-outline" size={18} color={COLORS.primary} />
+        <View style={[styles.scopeCard, { backgroundColor: colors.card }]}>
+          <Ionicons name="location-outline" size={18} color={colors.primary} />
           <View style={{ flex: 1, marginLeft: 10 }}>
             {user?.zone_id ? (
-              <Text style={styles.scopeText}>Zone: {user.zone_id}</Text>
+              <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Zone: {user.zone_id}</Text>
             ) : null}
             {user?.area_id ? (
-              <Text style={styles.scopeText}>Area: {user.area_id}</Text>
+              <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Area: {user.area_id}</Text>
             ) : null}
             {user?.branch_id ? (
-              <Text style={styles.scopeText}>Branch: {user.branch_id}</Text>
+              <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Branch: {user.branch_id}</Text>
             ) : null}
           </View>
         </View>
@@ -66,7 +68,7 @@ export default function DashboardScreen() {
       {/* Overview stats – role flavoured */}
       {!isClient && (
         <>
-          <Text style={styles.sectionTitle}>Overview</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Overview</Text>
           <View style={styles.summaryGrid}>
             <LinearGradient colors={['#4CAF50', '#45a049']} style={styles.summaryCard}>
               <Ionicons name="wallet-outline" size={20} color="#fff" style={styles.cardIcon} />
@@ -100,7 +102,7 @@ export default function DashboardScreen() {
 
       {isClient && (
         <>
-          <Text style={styles.sectionTitle}>My Portfolio</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>My Portfolio</Text>
           <View style={styles.summaryGrid}>
             <LinearGradient colors={['#4CAF50', '#45a049']} style={styles.summaryCard}>
               <Text style={styles.cardTitle}>Savings</Text>
@@ -115,7 +117,7 @@ export default function DashboardScreen() {
       )}
 
       {/* Role-specific quick actions */}
-      <Text style={styles.sectionTitle}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
         {isField ? 'Field Actions' : isManager ? 'Management' : 'Quick Actions'}
       </Text>
       <View style={styles.actionsGrid}>
@@ -125,7 +127,7 @@ export default function DashboardScreen() {
           return (
             <TouchableOpacity
               key={key}
-              style={styles.actionCard}
+              style={[styles.actionCard, { backgroundColor: colors.card }]}
               onPress={() => handleAction(key)}
               activeOpacity={0.8}
             >
@@ -141,7 +143,7 @@ export default function DashboardScreen() {
                   color={meta.color}
                 />
               </View>
-              <Text style={styles.actionLabel}>{meta.label}</Text>
+              <Text style={[styles.actionLabel, { color: colors.text }]}>{meta.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -155,7 +157,7 @@ export default function DashboardScreen() {
           activeOpacity={0.85}
         >
           <LinearGradient
-            colors={[COLORS.gradientStart, COLORS.gradientEnd]}
+            colors={[colors.gradientStart, colors.gradientEnd]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.searchBannerInner}
@@ -168,8 +170,8 @@ export default function DashboardScreen() {
       )}
 
       <View style={styles.infoCard}>
-        <Ionicons name="information-circle" size={20} color={COLORS.primary} />
-        <Text style={styles.infoText}>
+        <Ionicons name="information-circle" size={20} color={colors.primary} />
+        <Text style={[styles.infoText, { color: colors.primaryDark }]}>
           You are signed in as <Text style={{ fontWeight: '700' }}>{roleCfg.label}</Text>
           {roleCfg.scope !== 'system' && roleCfg.scope !== 'self'
             ? ` (${roleCfg.scope}-level access)`
@@ -184,7 +186,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
   },
   content: {
     padding: SPACING.md,
@@ -200,7 +202,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   name: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 24,
     fontWeight: '800',
     marginTop: 4,
@@ -214,7 +216,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   roleText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -226,19 +228,19 @@ const styles = StyleSheet.create({
   scopeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.md,
     padding: 12,
     marginBottom: SPACING.md,
   },
   scopeText: {
     fontSize: 13,
-    color: COLORS.textSecondary,
+    color: '#64748B',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#1E293B',
     marginBottom: 12,
     marginTop: 4,
   },
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   cardValue: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '800',
   },
@@ -280,7 +282,7 @@ const styles = StyleSheet.create({
     width: '30%',
     flexGrow: 1,
     maxWidth: '32%',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.md,
     paddingVertical: 14,
     paddingHorizontal: 8,
@@ -302,7 +304,7 @@ const styles = StyleSheet.create({
   actionLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#1E293B',
     textAlign: 'center',
   },
   searchBanner: {
@@ -318,7 +320,7 @@ const styles = StyleSheet.create({
   },
   searchBannerText: {
     flex: 1,
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
   },
@@ -332,7 +334,7 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 13,
-    color: COLORS.primaryDark,
+    color: '#2563EB',
     lineHeight: 18,
   },
 });

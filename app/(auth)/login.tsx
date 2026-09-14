@@ -16,7 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/auth';
-import { COLORS, SPACING, RADIUS } from '../../src/constants/config';
+import { useThemeStore } from '../../src/store/theme';
+import { SPACING, RADIUS } from '../../src/constants/config';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +28,7 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
 
   const { login, isLoading, error, clearError } = useAuthStore();
+  const { colors, mode, toggle } = useThemeStore();
 
   const handleLogin = async () => {
     if (!username.trim() || !password) {
@@ -41,9 +43,9 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.glowTop, { backgroundColor: colors.glowBlue }]} />
+      <View style={[styles.glowBottom, { backgroundColor: colors.glowPurple }]} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -55,62 +57,71 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.topBar}>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Ionicons name="moon-outline" size={20} color={COLORS.textSecondary} />
+            <TouchableOpacity
+              style={[styles.iconBtn, { backgroundColor: colors.card }]}
+              onPress={() => toggle()}
+            >
+              <Ionicons
+                name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'}
+                size={20}
+                color={colors.textSecondary}
+              />
             </TouchableOpacity>
-            <View style={styles.langBtn}>
-              <Ionicons name="globe-outline" size={16} color={COLORS.textSecondary} />
-              <Text style={styles.langText}>English</Text>
+            <View style={[styles.langBtn, { backgroundColor: colors.card }]}>
+              <Ionicons name="globe-outline" size={16} color={colors.textSecondary} />
+              <Text style={[styles.langText, { color: colors.textSecondary }]}>English</Text>
             </View>
           </View>
 
           <View style={styles.logoArea}>
-            <View style={styles.logoCircle}>
-              <Ionicons name="globe-outline" size={48} color={COLORS.secondary} />
+            <View style={[styles.logoCircle, { backgroundColor: mode === 'dark' ? 'rgba(168,85,247,0.15)' : 'rgba(168,85,247,0.08)' }]}>
+              <Ionicons name="globe-outline" size={48} color={colors.secondary} />
               <View style={styles.logoPerson}>
-                <Ionicons name="person" size={22} color={COLORS.primary} />
+                <Ionicons name="person" size={22} color={colors.primary} />
               </View>
             </View>
-            <Text style={styles.logoTitle}>CUPAD</Text>
-            <Text style={styles.logoTag}>SUCCESS IS OURS</Text>
+            <Text style={[styles.logoTitle, { color: colors.secondary }]}>CUPAD</Text>
+            <Text style={[styles.logoTag, { color: colors.primary }]}>SUCCESS IS OURS</Text>
           </View>
 
-          <Text style={styles.heading}>Staff Login</Text>
-          <Text style={styles.subheading}>Sign in to continue to your dashboard</Text>
+          <Text style={[styles.heading, { color: colors.primary }]}>Staff Login</Text>
+          <Text style={[styles.subheading, { color: colors.textSecondary }]}>
+            Sign in to continue to your dashboard
+          </Text>
 
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
             {error ? (
-              <View style={styles.errorBox}>
-                <Ionicons name="alert-circle" size={18} color={COLORS.error} />
-                <Text style={styles.errorText}>{error}</Text>
+              <View style={[styles.errorBox, { backgroundColor: colors.errorBg }]}>
+                <Ionicons name="alert-circle" size={18} color={colors.error} />
+                <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
               </View>
             ) : null}
 
-            <View style={styles.inputWrap}>
-              <Ionicons name="person-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+            <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+              <Ionicons name="person-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.text }]}
                 value={username}
                 onChangeText={setUsername}
                 placeholder="Username"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={colors.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!isLoading}
               />
               <TouchableOpacity style={styles.fingerprint}>
-                <Ionicons name="finger-print" size={22} color={COLORS.primary} />
+                <Ionicons name="finger-print" size={22} color={colors.primary} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+            <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+              <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.text }]}
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Password"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={colors.textMuted}
                 secureTextEntry={!showPassword}
                 editable={!isLoading}
               />
@@ -118,7 +129,7 @@ export default function LoginScreen() {
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={20}
-                  color={COLORS.textMuted}
+                  color={colors.textMuted}
                 />
               </TouchableOpacity>
             </View>
@@ -128,13 +139,19 @@ export default function LoginScreen() {
                 style={styles.rememberRow}
                 onPress={() => setRememberMe(!rememberMe)}
               >
-                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                <View
+                  style={[
+                    styles.checkbox,
+                    { borderColor: colors.border },
+                    rememberMe && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  ]}
+                >
                   {rememberMe && <Ionicons name="checkmark" size={12} color="#fff" />}
                 </View>
-                <Text style={styles.rememberText}>Remember Me</Text>
+                <Text style={[styles.rememberText, { color: colors.textSecondary }]}>Remember Me</Text>
               </TouchableOpacity>
               <TouchableOpacity>
-                <Text style={styles.forgotText}>Forgot Password?</Text>
+                <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot Password?</Text>
               </TouchableOpacity>
             </View>
 
@@ -145,7 +162,7 @@ export default function LoginScreen() {
               style={styles.loginBtnWrap}
             >
               <LinearGradient
-                colors={[COLORS.gradientStart, COLORS.gradientEnd]}
+                colors={[colors.gradientStart, colors.gradientEnd]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.loginBtn}
@@ -159,7 +176,9 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.footer}>© 2026 CUPAD System. All rights reserved.</Text>
+          <Text style={[styles.footer, { color: colors.textMuted }]}>
+            © 2026 CUPAD System. All rights reserved.
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -167,10 +186,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1 },
   glowTop: {
     position: 'absolute',
     top: -80,
@@ -178,7 +194,6 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: 'rgba(59, 130, 246, 0.12)',
   },
   glowBottom: {
     position: 'absolute',
@@ -187,7 +202,6 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: 'rgba(168, 85, 247, 0.1)',
   },
   scroll: {
     flexGrow: 1,
@@ -205,7 +219,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -217,7 +230,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: COLORS.white,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: RADIUS.full,
@@ -226,58 +238,23 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  langText: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    fontWeight: '500',
-  },
-  logoArea: {
-    alignItems: 'center',
-    marginBottom: 28,
-  },
+  langText: { fontSize: 13, fontWeight: '500' },
+  logoArea: { alignItems: 'center', marginBottom: 28 },
   logoCircle: {
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: 'rgba(168, 85, 247, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
     position: 'relative',
   },
-  logoPerson: {
-    position: 'absolute',
-    bottom: 14,
-    right: 18,
-  },
-  logoTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: COLORS.secondary,
-    letterSpacing: 1,
-  },
-  logoTag: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.primary,
-    letterSpacing: 1.5,
-    marginTop: 2,
-  },
-  heading: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: COLORS.primary,
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  subheading: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: 28,
-  },
+  logoPerson: { position: 'absolute', bottom: 14, right: 18 },
+  logoTitle: { fontSize: 22, fontWeight: '800', letterSpacing: 1 },
+  logoTag: { fontSize: 10, fontWeight: '600', letterSpacing: 1.5, marginTop: 2 },
+  heading: { fontSize: 28, fontWeight: '800', textAlign: 'center', marginBottom: 6 },
+  subheading: { fontSize: 14, textAlign: 'center', marginBottom: 28 },
   card: {
-    backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     shadowColor: '#000',
@@ -290,41 +267,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FEE2E2',
     padding: 12,
     borderRadius: RADIUS.sm,
     marginBottom: 16,
   },
-  errorText: {
-    flex: 1,
-    color: COLORS.error,
-    fontSize: 13,
-  },
+  errorText: { flex: 1, fontSize: 13 },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: COLORS.inputBorder,
     borderRadius: RADIUS.md,
     marginBottom: 14,
     paddingHorizontal: 12,
   },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: COLORS.text,
-  },
-  fingerprint: {
-    padding: 6,
-  },
-  eye: {
-    padding: 6,
-  },
+  inputIcon: { marginRight: 8 },
+  input: { flex: 1, paddingVertical: 14, fontSize: 15 },
+  fingerprint: { padding: 6 },
+  eye: { padding: 6 },
   rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -332,51 +291,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 4,
   },
-  rememberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   checkbox: {
     width: 18,
     height: 18,
     borderRadius: 4,
     borderWidth: 1.5,
-    borderColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkboxChecked: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  rememberText: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-  },
-  forgotText: {
-    fontSize: 13,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  loginBtnWrap: {
-    borderRadius: RADIUS.md,
-    overflow: 'hidden',
-  },
-  loginBtn: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderRadius: RADIUS.md,
-  },
-  loginBtnText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  footer: {
-    textAlign: 'center',
-    color: COLORS.textMuted,
-    fontSize: 11,
-    marginTop: 32,
-  },
+  rememberText: { fontSize: 13 },
+  forgotText: { fontSize: 13, fontWeight: '600' },
+  loginBtnWrap: { borderRadius: RADIUS.md, overflow: 'hidden' },
+  loginBtn: { paddingVertical: 16, alignItems: 'center', borderRadius: RADIUS.md },
+  loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  footer: { textAlign: 'center', fontSize: 11, marginTop: 32 },
 });

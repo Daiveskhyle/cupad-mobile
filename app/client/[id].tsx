@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { api } from '../../src/api/client';
-import { COLORS, SPACING } from '../../src/constants/config';
+import { SPACING } from '../../src/constants/config';
+import { useThemeStore } from '../../src/store/theme';
 import type { Portfolio, Loan, Transaction } from '../../src/types';
 
 function formatMoney(amount: number | undefined | null) {
@@ -24,6 +25,7 @@ function formatMoney(amount: number | undefined | null) {
 }
 
 export default function ClientPortfolioScreen() {
+  const colors = useThemeStore((s) => s.colors);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -60,16 +62,16 @@ export default function ClientPortfolioScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={'#3B82F6'} />
       </View>
     );
   }
 
   if (error || !portfolio) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>{error || 'Client not found'}</Text>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.error }]}>{error || 'Client not found'}</Text>
       </View>
     );
   }
@@ -78,7 +80,7 @@ export default function ClientPortfolioScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{ padding: SPACING.md, paddingBottom: 40 }}
       refreshControl={
         <RefreshControl
@@ -87,12 +89,12 @@ export default function ClientPortfolioScreen() {
             setRefreshing(true);
             load();
           }}
-          colors={[COLORS.primary]}
+          colors={['#3B82F6']}
         />
       }
     >
       {/* Client Header */}
-      <View style={styles.headerCard}>
+      <View style={[styles.headerCard, { backgroundColor: colors.primary }]}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
             {(client.name || '?').charAt(0).toUpperCase()}
@@ -139,28 +141,28 @@ export default function ClientPortfolioScreen() {
       {/* Loans List */}
       {loans.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>Active Loans</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Active Loans</Text>
           {loans.map((loan) => (
-            <View key={String(loan.id)} style={styles.listCard}>
+            <View key={String(loan.id)} style={[styles.listCard, { backgroundColor: colors.card }]}>
               <View style={styles.listRow}>
-                <Text style={styles.listLabel}>Principal</Text>
-                <Text style={styles.listValue}>
+                <Text style={[styles.listLabel, { color: colors.textSecondary }]}>Principal</Text>
+                <Text style={[styles.listValue, { color: colors.text }]}>
                   {formatMoney(loan.principal)}
                 </Text>
               </View>
               <View style={styles.listRow}>
-                <Text style={styles.listLabel}>Remaining</Text>
-                <Text style={[styles.listValue, { color: COLORS.warning }]}>
+                <Text style={[styles.listLabel, { color: colors.textSecondary }]}>Remaining</Text>
+                <Text style={[styles.listValue, { color: '#FFC107' }]}>
                   {formatMoney(loan.remaining_balance)}
                 </Text>
               </View>
               <View style={styles.listRow}>
-                <Text style={styles.listLabel}>Status</Text>
+                <Text style={[styles.listLabel, { color: colors.textSecondary }]}>Status</Text>
                 <Text style={styles.listValue}>{loan.status || '—'}</Text>
               </View>
               {loan.due_date && (
                 <View style={styles.listRow}>
-                  <Text style={styles.listLabel}>Due</Text>
+                  <Text style={[styles.listLabel, { color: colors.textSecondary }]}>Due</Text>
                   <Text style={styles.listValue}>{loan.due_date}</Text>
                 </View>
               )}
@@ -172,14 +174,14 @@ export default function ClientPortfolioScreen() {
       {/* Recent Transactions */}
       {transactions.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Transactions</Text>
           {transactions.slice(0, 15).map((tx, idx) => (
-            <View key={`${tx.transaction_id}-${idx}`} style={styles.txCard}>
+            <View key={`${tx.transaction_id}-${idx}`} style={[styles.txCard, { backgroundColor: colors.card }]}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.txType}>
+                <Text style={[styles.txType, { color: colors.text }]}>
                   {tx.source.toUpperCase()} • {tx.type}
                 </Text>
-                <Text style={styles.txDate}>{tx.date}</Text>
+                <Text style={[styles.txDate, { color: colors.textSecondary }]}>{tx.date}</Text>
               </View>
               <Text
                 style={[
@@ -188,8 +190,8 @@ export default function ClientPortfolioScreen() {
                     color:
                       tx.type?.toLowerCase().includes('deposit') ||
                       tx.type?.toLowerCase().includes('repayment')
-                        ? COLORS.success
-                        : COLORS.text,
+                        ? '#4CAF50'
+                        : '#1E293B',
                   },
                 ]}
               >
@@ -206,20 +208,20 @@ export default function ClientPortfolioScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
   },
   errorText: {
-    color: COLORS.error,
+    color: '#EF4444',
     fontSize: 16,
   },
   headerCard: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#3B82F6',
     borderRadius: 16,
     padding: SPACING.lg,
     alignItems: 'center',
@@ -229,7 +231,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -237,12 +239,12 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 26,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#FFFFFF',
   },
   clientName: {
     fontSize: 22,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#FFFFFF',
   },
   clientId: {
     fontSize: 13,
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 12,
-    color: COLORS.textSecondary,
+    color: '#1E293B'Secondary,
     marginBottom: 4,
   },
   summaryValue: {
@@ -276,12 +278,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#1E293B',
     marginTop: 20,
     marginBottom: 10,
   },
   listCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
@@ -293,17 +295,17 @@ const styles = StyleSheet.create({
   },
   listLabel: {
     fontSize: 13,
-    color: COLORS.textSecondary,
+    color: '#1E293B'Secondary,
   },
   listValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#1E293B',
   },
   txCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     borderRadius: 10,
     padding: 12,
     marginBottom: 8,
@@ -311,11 +313,11 @@ const styles = StyleSheet.create({
   txType: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#1E293B',
   },
   txDate: {
     fontSize: 12,
-    color: COLORS.textSecondary,
+    color: '#1E293B'Secondary,
     marginTop: 2,
   },
   txAmount: {

@@ -12,10 +12,12 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/api/client';
-import { COLORS, SPACING } from '../../src/constants/config';
+import { SPACING, RADIUS } from '../../src/constants/config';
+import { useThemeStore } from '../../src/store/theme';
 import type { Client } from '../../src/types';
 
 export default function SearchScreen() {
+  const colors = useThemeStore((s) => s.colors);
   const [query, setQuery] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,27 +59,27 @@ export default function SearchScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchBar}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Ionicons name="search" size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
         <TextInput
-          style={styles.input}
+          style={[styles.input, { color: colors.text }]}
           placeholder="Search by name, phone or ID..."
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={query}
           onChangeText={setQuery}
           onSubmitEditing={handleSearch}
           returnKeyType="search"
           autoCapitalize="none"
         />
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+        <TouchableOpacity style={[styles.searchBtn, { backgroundColor: colors.primary }]} onPress={handleSearch}>
           <Text style={styles.searchBtnText}>Search</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
+          <ActivityIndicator size="large" color={'#3B82F6'} />
         </View>
       ) : (
         <FlatList
@@ -88,12 +90,12 @@ export default function SearchScreen() {
             searched ? (
               <View style={styles.center}>
                 <Ionicons name="people-outline" size={48} color="#CBD5E1" />
-                <Text style={styles.emptyText}>No clients found</Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No clients found</Text>
               </View>
             ) : (
               <View style={styles.center}>
                 <Ionicons name="search-outline" size={48} color="#CBD5E1" />
-                <Text style={styles.emptyText}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                   Search for a client to view portfolio
                 </Text>
               </View>
@@ -101,7 +103,7 @@ export default function SearchScreen() {
           }
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={styles.card}
+              style={[styles.card, { backgroundColor: colors.card }]}
               onPress={() => openClient(item.id)}
             >
               <View style={styles.avatar}>
@@ -110,8 +112,8 @@ export default function SearchScreen() {
                 </Text>
               </View>
               <View style={styles.cardBody}>
-                <Text style={styles.clientName}>{item.name}</Text>
-                <Text style={styles.clientMeta}>
+                <Text style={[styles.clientName, { color: colors.text }]}>{item.name}</Text>
+                <Text style={[styles.clientMeta, { color: colors.textSecondary }]}>
                   {item.phone || 'No phone'} • ID: {item.id}
                 </Text>
                 {item.status && (
@@ -130,33 +132,33 @@ export default function SearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     margin: SPACING.md,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E2E8F0',
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: COLORS.text,
+    color: '#1E293B',
     paddingVertical: 8,
   },
   searchBtn: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: '#3B82F6',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
   },
   searchBtnText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
   },
@@ -168,13 +170,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     marginTop: 12,
-    color: COLORS.textSecondary,
+    color: '#1E293B'Secondary,
     fontSize: 15,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
@@ -188,13 +190,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   avatarText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '700',
   },
@@ -204,16 +206,16 @@ const styles = StyleSheet.create({
   clientName: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#1E293B',
   },
   clientMeta: {
     fontSize: 13,
-    color: COLORS.textSecondary,
+    color: '#1E293B'Secondary,
     marginTop: 2,
   },
   status: {
     fontSize: 12,
-    color: COLORS.accent,
+    color: '#3B82F6',
     marginTop: 2,
     fontWeight: '600',
   },
