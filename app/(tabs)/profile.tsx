@@ -1,28 +1,60 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch } from 'react-native';
+import { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  Switch,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../src/store/auth';
 import { useThemeStore } from '../../src/store/theme';
 import { getRoleConfig } from '../../src/constants/roles';
-import { SPACING, RADIUS } from '../../src/constants/config';
+import { SPACING } from '../../src/constants/config';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
   const { colors, mode, toggle } = useThemeStore();
   const roleCfg = getRoleConfig(user?.role);
+  const [busy, setBusy] = useState(false);
 
   const displayName =
     user?.full_name || user?.name || user?.username || 'User';
 
+  const doLogout = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await logout();
+    } finally {
+      // Root index redirects based on isAuthenticated
+      router.replace('/');
+      setBusy(false);
+    }
+  };
+
   const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      // Alert.alert is unreliable on web
+      const ok =
+        typeof window !== 'undefined'
+          ? window.confirm('Are you sure you want to sign out?')
+          : true;
+      if (ok) void doLogout();
+      return;
+    }
+
     Alert.alert('Logout', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Logout',
         style: 'destructive',
-        onPress: async () => {
-          await logout();
-          router.replace('/(auth)/login');
+        onPress: () => {
+          void doLogout();
         },
       },
     ]);
@@ -41,12 +73,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <InfoRow
-          icon="person-outline"
-          label="Username"
-          value={user?.username}
-          colors={colors}
-        />
+        <InfoRow icon="person-outline" label="Username" value={user?.username} colors={colors} />
         <InfoRow icon="mail-outline" label="Email" value={user?.email || '—'} colors={colors} />
         <InfoRow icon="call-outline" label="Phone" value={user?.phone || '—'} colors={colors} />
         <InfoRow
@@ -55,10 +82,15 @@ export default function ProfileScreen() {
           value={user?.branch_id || '—'}
           colors={colors}
         />
-        <InfoRow icon="map-outline" label="Zone" value={user?.zone_id || '—'} colors={colors} last />
+        <InfoRow
+          icon="map-outline"
+          label="Zone"
+          value={user?.zone_id || '—'}
+          colors={colors}
+          last
+        />
       </View>
 
-      {/* Dark mode toggle */}
       <View style={[styles.card, { backgroundColor: colors.card, marginTop: 12 }]}>
         <View style={styles.themeRow}>
           <View style={styles.themeLeft}>
@@ -84,11 +116,19 @@ export default function ProfileScreen() {
       </View>
 
       <TouchableOpacity
-        style={[styles.logoutBtn, { backgroundColor: colors.logoutBg }]}
+        style={[styles.logoutBtn, { backgroundColor: colors.logoutBg, opacity: busy ? 0.7 : 1 }]}
         onPress={handleLogout}
+        disabled={busy}
+        activeOpacity={0.8}
       >
-        <Ionicons name="log-out-outline" size={22} color={colors.error} />
-        <Text style={[styles.logoutText, { color: colors.error }]}>Sign Out</Text>
+        {busy ? (
+          <ActivityIndicator color={colors.error} />
+        ) : (
+          <>
+            <Ionicons name="log-out-outline" size={22} color={colors.error} />
+            <Text style={[styles.logoutText, { color: colors.error }]}>Sign Out</Text>
+          </>
+        )}
       </TouchableOpacity>
     </View>
   );

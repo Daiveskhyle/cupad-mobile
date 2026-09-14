@@ -48,8 +48,18 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    await api.logout();
-    set({ user: null, isAuthenticated: false, error: null });
+    // Always clear local session first so UI never stays stuck logged-in
+    set({ user: null, isAuthenticated: false, isLoading: false, error: null });
+    try {
+      await api.logout();
+    } catch {
+      // ignore storage errors – session already cleared in memory
+      try {
+        await api.clearToken();
+      } catch {
+        /* ignore */
+      }
+    }
   },
 
   loadUser: async () => {
@@ -68,7 +78,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ user: null, isAuthenticated: false, isLoading: false });
       }
     } catch {
-      await api.clearToken();
+      try {
+        await api.clearToken();
+      } catch {
+        /* ignore */
+      }
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
