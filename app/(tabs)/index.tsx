@@ -167,10 +167,24 @@ export default function DashboardScreen() {
       {!isClient && activities.length > 0 ? (
         <>
           <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, styles.sectionTitleNoMargin, { color: colors.text }]}>Recent Activity</Text>
-            <Text style={[styles.historyHint, { color: colors.textSecondary }]}>Latest 30</Text>
+            <View style={styles.sectionHeaderTitle}>
+              <Text style={[styles.sectionTitle, styles.sectionTitleNoMargin, { color: colors.text }]}>Recent Activity</Text>
+              <Text style={[styles.historyHint, { color: colors.textSecondary }]}>Latest 30</Text>
+            </View>
+            {isField ? (
+              <TouchableOpacity
+                onPress={() => router.push('/co/history')}
+                style={[styles.historyButton, { backgroundColor: colors.primary + '12' }]}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="View all CO history"
+              >
+                <Text style={[styles.historyButtonText, { color: colors.primary }]}>View all</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+              </TouchableOpacity>
+            ) : null}
           </View>
-          {activities.map((item, index) => {
+          {activities.slice(0, 5).map((item, index) => {
             const color = activityColor(item.type);
             const date = item.date ? new Date(item.date).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
             return (
@@ -229,7 +243,10 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 4 },
   sectionTitleNoMargin: { marginBottom: 0 },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 12 },
-  historyHint: { fontSize: 11, fontWeight: '600' },
+  sectionHeaderTitle: { flex: 1 },
+  historyHint: { fontSize: 11, fontWeight: '600', marginTop: 3 },
+  historyButton: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.full },
+  historyButtonText: { fontSize: 12, fontWeight: '800' },
   summaryGrid: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   summaryCard: { flex: 1, borderRadius: RADIUS.md, padding: 14, minHeight: 90 },
   cardIcon: { position: 'absolute', top: 10, right: 10, opacity: 0.9 },
