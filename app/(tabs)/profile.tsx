@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch, Platform, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../src/store/auth';
@@ -6,13 +6,39 @@ import { useThemeStore } from '../../src/store/theme';
 import { getRoleConfig } from '../../src/constants/roles';
 import { SPACING } from '../../src/constants/config';
 import { Ionicons } from '@expo/vector-icons';
+import { loadDashboardStats } from '../../src/services/data';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
   const { colors, mode, toggle } = useThemeStore();
   const roleCfg = getRoleConfig(user?.role);
   const [busy, setBusy] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [location, setLocation] = useState({
+    zone: user?.zone_name || '',
+    area: user?.area_name || '',
+    branch: user?.branch_name || '',
+  });
   const displayName = user?.full_name || user?.name || user?.username || 'User';
+
+  const loadLocation = useCallback(async () => {
+    setLocationLoading(true);
+    try {
+      const res = await loadDashboardStats();
+      const stats = res.data || {};
+      setLocation({
+        zone: stats.zone_name || user?.zone_name || '',
+        area: stats.area_name || user?.area_name || '',
+        branch: stats.branch_name || user?.branch_name || '',
+      });
+    } finally {
+      setLocationLoading(false);
+    }
+  }, [user?.zone_name, user?.area_name, user?.branch_name]);
+
+  useEffect(() => {
+    void loadLocation();
+  }, [loadLocation]);
 
   const doLogout = async () => {
     if (busy) return;
@@ -49,8 +75,27 @@ export default function ProfileScreen() {
         <InfoRow icon="person-outline" label="Username" value={user?.username} colors={colors} />
         <InfoRow icon="mail-outline" label="Email" value={user?.email || '—'} colors={colors} />
         <InfoRow icon="call-outline" label="Phone" value={user?.phone || '—'} colors={colors} />
-        <InfoRow icon="business-outline" label="Branch" value={user?.branch_id || '—'} colors={colors} />
-        <InfoRow icon="map-outline" label="Zone" value={user?.zone_id || '—'} colors={colors} last />
+      </View>
+
+      <View style={[styles.card, { backgroundColor: colors.card, marginTop: 12 }]}>
+        <View style={styles.locationHeader}>
+          <View style={[styles.locationIcon, { backgroundColor: colors.primary + '16' }]}>
+            <Ionicons name="location-outline" size={21} color={colors.primary} />
+          </View>
+          <View style={styles.locationHeaderText}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Assigned Location</Text>
+            <Text style={[styles.sectionHint, { color: colors.textSecondary }]}>Your current field assignment</Text>
+          </View>
+        </View>
+        {locationLoading ? (
+          <View style={styles.loadingRow}><ActivityIndicator size="small" color={colors.primary} /><Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading location…</Text></View>
+        ) : (
+          <>
+            <InfoRow icon="globe-outline" label="Zone" value={location.zone || 'Not assigned'} colors={colors} />
+            <InfoRow icon="map-outline" label="Area" value={location.area || 'Not assigned'} colors={colors} />
+            <InfoRow icon="business-outline" label="Branch" value={location.branch || 'Not assigned'} colors={colors} last />
+          </>
+        )}
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.card, marginTop: 12 }]}>
@@ -68,7 +113,7 @@ export default function ProfileScreen() {
 }
 
 function InfoRow({ icon, label, value, colors, last }: { icon: keyof typeof Ionicons.glyphMap; label: string; value?: string | null; colors: any; last?: boolean }) {
-  return <View style={[styles.row, !last && { borderBottomWidth: 1, borderBottomColor: colors.border }]}><Ionicons name={icon} size={20} color={colors.primary} /><View style={styles.rowText}><Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{label}</Text><Text style={[styles.rowValue, { color: colors.text }]}>{value || '—'}</Text></View></View>;
+  return <View style={[styles.row, !last && { borderBottomWidth: 1, borderBottomColor: colors.border }]}><Ionicons name={icon} size={20} color={colors.primary} /><View style={styles.rowText}><Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{label}</Text><Text style={[styles.rowValue, { color: colors.text }]} numberOfLines={2}>{value || '—'}</Text></View></View>;
 }
 
 const styles = StyleSheet.create({
@@ -83,6 +128,13 @@ const styles = StyleSheet.create({
   rowText: { marginLeft: 14, flex: 1 },
   rowLabel: { fontSize: 12 },
   rowValue: { fontSize: 15, fontWeight: '500', marginTop: 2 },
+  locationHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, paddingBottom: 6 },
+  locationIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  locationHeaderText: { marginLeft: 12, flex: 1 },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  sectionHint: { fontSize: 12, marginTop: 2 },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', padding: 18 },
+  loadingText: { marginLeft: 10, fontSize: 13 },
   themeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
   themeLeft: { flexDirection: 'row', alignItems: 'center' },
   themeLabel: { fontSize: 15, fontWeight: '600' },
