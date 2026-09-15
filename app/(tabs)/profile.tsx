@@ -5,11 +5,22 @@ import { router } from 'expo-router';
 import { useAuthStore } from '../../src/store/auth';
 import { useThemeStore } from '../../src/store/theme';
 import { getRoleConfig } from '../../src/constants/roles';
-import { SPACING } from '../../src/constants/config';
+import { SPACING, API_BASE_URL } from '../../src/constants/config';
 import { Ionicons } from '@expo/vector-icons';
 import { loadDashboardStats } from '../../src/services/data';
 
 type Location = { zone: string; area: string; branch: string };
+
+// Keep profile images consistent with the header avatar.
+// The API may return either a full URL or a relative uploads path.
+const resolveProfileUri = (value?: string | null) => {
+  const raw = String(value || '').trim();
+  if (!raw || raw.toLowerCase().includes('default_avatar')) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const clean = raw.replace(/^\.\//, '').replace(/^\//, '');
+  const origin = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  return `${origin}/${clean}`;
+};
 
 export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuthStore();
@@ -32,6 +43,7 @@ export default function ProfileScreen() {
 
   const displayName = name.trim() || user?.username || 'User';
   const initials = useMemo(() => displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join(''), [displayName]);
+  const profileUri = resolveProfileUri(profilePic);
 
   useEffect(() => {
     setName(user?.full_name || user?.name || '');
@@ -149,11 +161,19 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => void choosePhoto()} activeOpacity={0.85} disabled={uploading || saving}>
-            {profilePic ? (
-              <Image source={{ uri: profilePic }} style={styles.avatarImage} />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: roleCfg.accent || colors.primary }]}><Text style={styles.avatarText}>{initials || 'U'}</Text></View>
-            )}
+            <View style={[styles.avatarFrame, { backgroundColor: colors.infoBg, borderColor: colors.primary }]}>
+              {profileUri ? (
+                <Image
+                  source={{ uri: profileUri }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                  onError={() => setProfilePic(undefined)}
+                  accessibilityLabel="Profile picture"
+                />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: roleCfg.accent || colors.primary }]}><Text style={styles.avatarText}>{initials || 'U'}</Text></View>
+              )}
+            </View>
             <View style={[styles.cameraBadge, { backgroundColor: colors.primary, borderColor: colors.background }]}>
               {uploading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="camera" size={14} color="#fff" />}
             </View>
@@ -237,8 +257,9 @@ function InfoRow({ icon, label, value, colors, last }: { icon: keyof typeof Ioni
 const styles = StyleSheet.create({
   container: { padding: SPACING.md, paddingBottom: 40 },
   header: { alignItems: 'center', marginVertical: 20 },
-  avatar: { width: 94, height: 94, borderRadius: 47, justifyContent: 'center', alignItems: 'center' },
-  avatarImage: { width: 94, height: 94, borderRadius: 47 },
+  avatarFrame: { width: 98, height: 98, borderRadius: 49, justifyContent: 'center', alignItems: 'center', borderWidth: 2, padding: 2, overflow: 'hidden' },
+  avatar: { width: '100%', height: '100%', borderRadius: 47, justifyContent: 'center', alignItems: 'center' },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 47 },
   avatarText: { fontSize: 34, fontWeight: '700', color: '#fff' },
   cameraBadge: { position: 'absolute', right: 0, bottom: 0, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 3 },
   name: { fontSize: 22, fontWeight: '700', marginTop: 12 },
