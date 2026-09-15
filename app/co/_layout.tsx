@@ -47,7 +47,7 @@ export default function CoLayout() {
         headerTintColor: colors.primary,
         headerShadowVisible: false,
         headerTitleAlign: 'left',
-        headerTitleStyle: { fontWeight: '700', fontSize: 17, color: colors.primary },
+        headerTitle: () => null,
         contentStyle: { backgroundColor: colors.background },
         headerLeft: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 0, gap: 8 }}>
