@@ -33,10 +33,11 @@ export default function DashboardScreen() {
   const isClient = roleCfg.key === 'client';
   const isManager = ['am', 'bm', 'zm', 'dzm', 'tm', 'admin'].includes(roleCfg.key);
 
+  // Display only database-resolved location names. IDs must never be shown as labels.
   const location = {
-    zone: stats?.zone_name || user?.zone_name || user?.zone_id,
-    area: stats?.area_name || user?.area_name || user?.area_id,
-    branch: stats?.branch_name || user?.branch_name || user?.branch_id,
+    zone: typeof stats?.zone_name === 'string' && stats.zone_name.trim() ? stats.zone_name : (typeof user?.zone_name === 'string' && user.zone_name.trim() ? user.zone_name : null),
+    area: typeof stats?.area_name === 'string' && stats.area_name.trim() ? stats.area_name : (typeof user?.area_name === 'string' && user.area_name.trim() ? user.area_name : null),
+    branch: typeof stats?.branch_name === 'string' && stats.branch_name.trim() ? stats.branch_name : (typeof user?.branch_name === 'string' && user.branch_name.trim() ? user.branch_name : null),
   };
 
   const handleAction = (key: string) => {
