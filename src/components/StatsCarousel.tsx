@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { RADIUS, SPACING } from '../constants/config';
 
 type StatItem = {
@@ -14,16 +14,23 @@ type Props = {
   items: StatItem[];
 };
 
+const CARD_GAP = 12;
+
 export default function StatsCarousel({ items }: Props) {
+  const { width: screenWidth } = useWindowDimensions();
+  const cardWidth = Math.max(0, screenWidth - SPACING.md * 2);
+  const snapInterval = cardWidth + CARD_GAP;
+
   return (
     <View style={styles.wrapper}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingRight: SPACING.md }]}
         decelerationRate="fast"
         snapToAlignment="start"
-        snapToInterval={296}
+        snapToInterval={snapInterval}
+        disableIntervalMomentum
       >
         {items.map((item, index) => (
           <LinearGradient
@@ -31,26 +38,36 @@ export default function StatsCarousel({ items }: Props) {
             colors={item.colors}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.card}
+            style={[styles.card, { width: cardWidth, marginRight: index === items.length - 1 ? 0 : CARD_GAP }]}
           >
             <View style={styles.topRow}>
               <View style={styles.iconCircle}>
-                <Ionicons name={item.icon as any} size={21} color="#fff" />
+                <Ionicons name={item.icon as any} size={23} color="#fff" />
               </View>
               <Text style={styles.index}>{index + 1}/{items.length}</Text>
             </View>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit>{item.value}</Text>
+
+            <View>
+              <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit>{item.value}</Text>
+            </View>
+
             <View style={styles.bottomRow}>
               <Text style={styles.swipeHint}>Swipe for more</Text>
-              <Ionicons name="arrow-forward" size={16} color="rgba(255,255,255,0.85)" />
+              <Ionicons name="arrow-forward" size={17} color="rgba(255,255,255,0.85)" />
             </View>
           </LinearGradient>
         ))}
       </ScrollView>
+
       {items.length > 1 ? (
         <View style={styles.dots}>
-          {items.map((item, index) => <View key={`${item.title}-dot-${index}`} style={[styles.dot, index === 0 && styles.activeDot]} />)}
+          {items.map((item, index) => (
+            <View
+              key={`${item.title}-dot-${index}`}
+              style={[styles.dot, index === 0 && styles.activeDot]}
+            />
+          ))}
         </View>
       ) : null}
     </View>
@@ -59,16 +76,28 @@ export default function StatsCarousel({ items }: Props) {
 
 const styles = StyleSheet.create({
   wrapper: { marginBottom: SPACING.md },
-  content: { paddingRight: SPACING.md, gap: 10 },
-  card: { width: 286, minHeight: 138, borderRadius: RADIUS.lg, padding: 17, justifyContent: 'space-between' },
+  content: { paddingLeft: SPACING.md },
+  card: {
+    minHeight: 168,
+    borderRadius: RADIUS.lg,
+    padding: 20,
+    justifyContent: 'space-between',
+  },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  iconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  index: { color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: '700' },
-  title: { color: 'rgba(255,255,255,0.88)', fontSize: 12, fontWeight: '700', marginTop: 12 },
-  value: { color: '#fff', fontSize: 23, fontWeight: '900', marginTop: 2 },
-  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 9 },
-  swipeHint: { color: 'rgba(255,255,255,0.68)', fontSize: 10, fontWeight: '600' },
-  dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, marginTop: 8 },
+  iconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  index: { color: 'rgba(255,255,255,0.78)', fontSize: 12, fontWeight: '800' },
+  title: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '700', marginTop: 18 },
+  value: { color: '#fff', fontSize: 30, fontWeight: '900', marginTop: 4 },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
+  swipeHint: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
+  dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, marginTop: 9 },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#CBD5E1' },
   activeDot: { width: 16, backgroundColor: '#64748B' },
 });
