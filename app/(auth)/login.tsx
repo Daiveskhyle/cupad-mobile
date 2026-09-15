@@ -26,159 +26,189 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [focused, setFocused] = useState<'username' | 'password' | null>(null);
 
   const { login, isLoading, error, clearError } = useAuthStore();
   const { colors, mode, toggle } = useThemeStore();
 
   const handleLogin = async () => {
-    if (!username.trim() || !password) {
-      Alert.alert('Error', 'Please enter username and password');
+    const cleanUsername = username.trim();
+    if (!cleanUsername || !password) {
+      Alert.alert('Missing details', 'Enter your username and password to continue.');
       return;
     }
     clearError();
-    const success = await login(username.trim(), password);
-    if (success) {
-      router.replace('/(tabs)');
-    }
+    const success = await login(cleanUsername, password);
+    if (success) router.replace('/(tabs)');
   };
+
+  const canSubmit = username.trim().length > 0 && password.length > 0 && !isLoading;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.glowTop, { backgroundColor: colors.glowBlue }]} />
       <View style={[styles.glowBottom, { backgroundColor: colors.glowPurple }]} />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets
         >
           <View style={styles.topBar}>
-            <TouchableOpacity
-              style={[styles.iconBtn, { backgroundColor: colors.card }]}
-              onPress={() => toggle()}
-            >
-              <Ionicons
-                name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'}
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-            <View style={[styles.langBtn, { backgroundColor: colors.card }]}>
-              <Ionicons name="globe-outline" size={16} color={colors.textSecondary} />
-              <Text style={[styles.langText, { color: colors.textSecondary }]}>English</Text>
+            <View>
+              <Text style={[styles.topBrand, { color: colors.text }]}>CUPAD</Text>
+              <Text style={[styles.topBrandSub, { color: colors.textMuted }]}>STAFF PORTAL</Text>
             </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Toggle dark mode"
+              style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={toggle}
+            >
+              <Ionicons name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'} size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.logoArea}>
-            <View style={[styles.logoCircle, { backgroundColor: mode === 'dark' ? 'rgba(168,85,247,0.15)' : 'rgba(168,85,247,0.08)' }]}>
-              <Ionicons name="globe-outline" size={48} color={colors.secondary} />
-              <View style={styles.logoPerson}>
-                <Ionicons name="person" size={22} color={colors.primary} />
-              </View>
+            <View style={[styles.logoCircle, { backgroundColor: colors.glowBlue, borderColor: colors.primary + '25' }]}>
+              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={styles.logoGradient}>
+                <Ionicons name="people" size={34} color="#fff" />
+              </LinearGradient>
             </View>
-            <Text style={[styles.logoTitle, { color: colors.secondary }]}>CUPAD</Text>
-            <Text style={[styles.logoTag, { color: colors.primary }]}>SUCCESS IS OURS</Text>
+            <Text style={[styles.welcome, { color: colors.text }]}>Welcome back</Text>
+            <Text style={[styles.subheading, { color: colors.textSecondary }]}>Sign in securely to manage your CUPAD field activities.</Text>
           </View>
 
-          <Text style={[styles.heading, { color: colors.primary }]}>Staff Login</Text>
-          <Text style={[styles.subheading, { color: colors.textSecondary }]}>
-            Sign in to continue to your dashboard
-          </Text>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeader}>
+              <View>
+                <Text style={[styles.heading, { color: colors.text }]}>Staff Login</Text>
+                <Text style={[styles.cardHint, { color: colors.textSecondary }]}>Use your assigned account credentials</Text>
+              </View>
+              <View style={[styles.secureBadge, { backgroundColor: colors.infoBg }]}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
+              </View>
+            </View>
 
-          <View style={[styles.card, { backgroundColor: colors.card }]}>
             {error ? (
-              <View style={[styles.errorBox, { backgroundColor: colors.errorBg }]}>
-                <Ionicons name="alert-circle" size={18} color={colors.error} />
-                <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+              <View style={[styles.errorBox, { backgroundColor: colors.errorBg, borderColor: colors.error + '30' }]}>
+                <Ionicons name="alert-circle-outline" size={19} color={colors.error} />
+                <View style={styles.errorContent}>
+                  <Text style={[styles.errorTitle, { color: colors.error }]}>Login failed</Text>
+                  <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+                </View>
+                <TouchableOpacity onPress={clearError} hitSlop={8}>
+                  <Ionicons name="close" size={18} color={colors.error} />
+                </TouchableOpacity>
               </View>
             ) : null}
 
-            <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-              <Ionicons name="person-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Username</Text>
+            <View style={[
+              styles.inputWrap,
+              { backgroundColor: colors.inputBg, borderColor: focused === 'username' ? colors.primary : colors.inputBorder },
+              focused === 'username' && { backgroundColor: colors.card, shadowColor: colors.primary, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 },
+            ]}>
+              <View style={[styles.inputIconBox, { backgroundColor: colors.infoBg }]}>
+                <Ionicons name="person-outline" size={18} color={colors.primary} />
+              </View>
               <TextInput
                 style={[styles.input, { color: colors.text }]}
                 value={username}
-                onChangeText={setUsername}
-                placeholder="Username"
+                onChangeText={(v) => { setUsername(v); if (error) clearError(); }}
+                placeholder="Enter your username"
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoComplete="username"
+                textContentType="username"
+                returnKeyType="next"
                 editable={!isLoading}
+                onFocus={() => setFocused('username')}
+                onBlur={() => setFocused(null)}
+                onSubmitEditing={() => setFocused('password')}
               />
-              <TouchableOpacity style={styles.fingerprint}>
-                <Ionicons name="finger-print" size={22} color={colors.primary} />
-              </TouchableOpacity>
+              {username.length > 0 && (
+                <TouchableOpacity onPress={() => setUsername('')} hitSlop={8}>
+                  <Ionicons name="close-circle" size={19} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
             </View>
 
-            <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-              <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Password</Text>
+            <View style={[
+              styles.inputWrap,
+              { backgroundColor: colors.inputBg, borderColor: focused === 'password' ? colors.primary : colors.inputBorder },
+              focused === 'password' && { backgroundColor: colors.card, shadowColor: colors.primary, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 },
+            ]}>
+              <View style={[styles.inputIconBox, { backgroundColor: colors.infoBg }]}>
+                <Ionicons name="lock-closed-outline" size={18} color={colors.primary} />
+              </View>
               <TextInput
                 style={[styles.input, { color: colors.text }]}
                 value={password}
-                onChangeText={setPassword}
-                placeholder="Password"
+                onChangeText={(v) => { setPassword(v); if (error) clearError(); }}
+                placeholder="Enter your password"
                 placeholderTextColor={colors.textMuted}
                 secureTextEntry={!showPassword}
+                autoComplete="password"
+                textContentType="password"
+                returnKeyType="done"
                 editable={!isLoading}
+                onFocus={() => setFocused('password')}
+                onBlur={() => setFocused(null)}
+                onSubmitEditing={handleLogin}
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eye}>
-                <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color={colors.textMuted}
-                />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={8} style={styles.eye} accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
+                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.rowBetween}>
-              <TouchableOpacity
-                style={styles.rememberRow}
-                onPress={() => setRememberMe(!rememberMe)}
-              >
-                <View
-                  style={[
-                    styles.checkbox,
-                    { borderColor: colors.border },
-                    rememberMe && { backgroundColor: colors.primary, borderColor: colors.primary },
-                  ]}
-                >
+              <TouchableOpacity style={styles.rememberRow} onPress={() => setRememberMe(!rememberMe)} activeOpacity={0.7}>
+                <View style={[styles.checkbox, { borderColor: rememberMe ? colors.primary : colors.border, backgroundColor: rememberMe ? colors.primary : 'transparent' }]}>
                   {rememberMe && <Ionicons name="checkmark" size={12} color="#fff" />}
                 </View>
-                <Text style={[styles.rememberText, { color: colors.textSecondary }]}>Remember Me</Text>
+                <Text style={[styles.rememberText, { color: colors.textSecondary }]}>Remember me</Text>
               </TouchableOpacity>
-              <TouchableOpacity>
-                <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot Password?</Text>
+              <TouchableOpacity onPress={() => Alert.alert('Password help', 'Please contact your CUPAD administrator to reset your password.')}>
+                <Text style={[styles.forgotText, { color: colors.primary }]}>Need help?</Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
-              activeOpacity={0.85}
+              activeOpacity={0.9}
               onPress={handleLogin}
-              disabled={isLoading}
-              style={styles.loginBtnWrap}
+              disabled={!canSubmit}
+              style={[styles.loginBtnWrap, { opacity: canSubmit ? 1 : 0.55 }]}
             >
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.loginBtn}
-              >
+              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.loginBtn}>
                 {isLoading ? (
-                  <ActivityIndicator color="#fff" />
+                  <>
+                    <ActivityIndicator color="#fff" />
+                    <Text style={styles.loginBtnText}>Signing in…</Text>
+                  </>
                 ) : (
-                  <Text style={styles.loginBtnText}>Login</Text>
+                  <>
+                    <Text style={styles.loginBtnText}>Sign in</Text>
+                    <Ionicons name="arrow-forward" size={19} color="#fff" />
+                  </>
                 )}
               </LinearGradient>
             </TouchableOpacity>
+
+            <View style={styles.securityRow}>
+              <Ionicons name="lock-closed" size={13} color={colors.success} />
+              <Text style={[styles.securityText, { color: colors.textMuted }]}>Your login is protected and securely transmitted</Text>
+            </View>
           </View>
 
-          <Text style={[styles.footer, { color: colors.textMuted }]}>
-            © 2026 CUPAD System. All rights reserved.
-          </Text>
+          <View style={styles.footerBlock}>
+            <Text style={[styles.motto, { color: colors.primary }]}>SUCCESS IS OURS</Text>
+            <Text style={[styles.footer, { color: colors.textMuted }]}>CUPAD Staff Portal • © 2026</Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -186,124 +216,45 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   container: { flex: 1 },
-  glowTop: {
-    position: 'absolute',
-    top: -80,
-    left: width * 0.2,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-  },
-  glowBottom: {
-    position: 'absolute',
-    bottom: 40,
-    right: -40,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-  },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: Platform.OS === 'ios' ? 56 : 40,
-    paddingBottom: 40,
-  },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  langBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: RADIUS.full,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  langText: { fontSize: 13, fontWeight: '500' },
+  glowTop: { position: 'absolute', top: -90, left: width * 0.12, width: 250, height: 250, borderRadius: 125, opacity: 0.7 },
+  glowBottom: { position: 'absolute', bottom: -40, right: -50, width: 220, height: 220, borderRadius: 110, opacity: 0.55 },
+  scroll: { flexGrow: 1, width: '100%', maxWidth: 520, alignSelf: 'center', paddingHorizontal: SPACING.lg, paddingTop: Platform.OS === 'ios' ? 54 : 32, paddingBottom: 32 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 },
+  topBrand: { fontSize: 16, fontWeight: '800', letterSpacing: 1 },
+  topBrandSub: { fontSize: 9, fontWeight: '700', letterSpacing: 1.4, marginTop: 2 },
+  iconBtn: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
   logoArea: { alignItems: 'center', marginBottom: 28 },
-  logoCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    position: 'relative',
-  },
-  logoPerson: { position: 'absolute', bottom: 14, right: 18 },
-  logoTitle: { fontSize: 22, fontWeight: '800', letterSpacing: 1 },
-  logoTag: { fontSize: 10, fontWeight: '600', letterSpacing: 1.5, marginTop: 2 },
-  heading: { fontSize: 28, fontWeight: '800', textAlign: 'center', marginBottom: 6 },
-  subheading: { fontSize: 14, textAlign: 'center', marginBottom: 28 },
-  card: {
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 6,
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    borderRadius: RADIUS.sm,
-    marginBottom: 16,
-  },
-  errorText: { flex: 1, fontSize: 13 },
-  inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: RADIUS.md,
-    marginBottom: 14,
-    paddingHorizontal: 12,
-  },
-  inputIcon: { marginRight: 8 },
-  input: { flex: 1, paddingVertical: 14, fontSize: 15 },
-  fingerprint: { padding: 6 },
-  eye: { padding: 6 },
-  rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 4,
-  },
+  logoCircle: { width: 92, height: 92, borderRadius: 46, justifyContent: 'center', alignItems: 'center', borderWidth: 1, marginBottom: 18 },
+  logoGradient: { width: 68, height: 68, borderRadius: 34, justifyContent: 'center', alignItems: 'center' },
+  welcome: { fontSize: 27, fontWeight: '800', textAlign: 'center' },
+  subheading: { fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6, maxWidth: 350 },
+  card: { borderRadius: RADIUS.lg, padding: SPACING.lg, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 5 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 },
+  heading: { fontSize: 21, fontWeight: '800' },
+  cardHint: { fontSize: 12, marginTop: 4 },
+  secureBadge: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  errorBox: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: RADIUS.sm, borderWidth: 1, marginBottom: 18, gap: 9 },
+  errorContent: { flex: 1 },
+  errorTitle: { fontSize: 12, fontWeight: '800', marginBottom: 2 },
+  errorText: { fontSize: 12, lineHeight: 17 },
+  fieldLabel: { fontSize: 12, fontWeight: '700', marginBottom: 7, marginLeft: 2 },
+  inputWrap: { minHeight: 56, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md, marginBottom: 16, paddingHorizontal: 10 },
+  inputIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  input: { flex: 1, paddingHorizontal: 10, paddingVertical: 14, fontSize: 15 },
+  eye: { padding: 7 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2, marginBottom: 22 },
   rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rememberText: { fontSize: 13 },
-  forgotText: { fontSize: 13, fontWeight: '600' },
+  checkbox: { width: 19, height: 19, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  rememberText: { fontSize: 12 },
+  forgotText: { fontSize: 12, fontWeight: '700' },
   loginBtnWrap: { borderRadius: RADIUS.md, overflow: 'hidden' },
-  loginBtn: { paddingVertical: 16, alignItems: 'center', borderRadius: RADIUS.md },
-  loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  footer: { textAlign: 'center', fontSize: 11, marginTop: 32 },
+  loginBtn: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 },
+  loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  securityRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 16 },
+  securityText: { fontSize: 10, textAlign: 'center' },
+  footerBlock: { alignItems: 'center', marginTop: 28 },
+  motto: { fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  footer: { fontSize: 10, marginTop: 5 },
 });
