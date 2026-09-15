@@ -1,342 +1,58 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useThemeStore } from '../../src/store/theme';
 import { SPACING, RADIUS } from '../../src/constants/config';
 import { api } from '../../src/api/client';
-import type { Client, Loan, Portfolio } from '../../src/types';
-import { ClientPicker } from '../../src/components/ClientPicker';
+import type { Client } from '../../src/types';
 
-const money = (value: number | undefined | null) => `₦${Number(value || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
-const today = () => new Date().toISOString().slice(0, 10);
+const money=(v:number|undefined|null)=>`₦${Number(v||0).toLocaleString('en-NG',{maximumFractionDigits:0})}`;
+const today=()=>new Date().toISOString().slice(0,10);
+type Row={id:string;name:string;loan:any|null;savings_balance:number;existing:{loan_amt:number;sav_amt:number;wth_type:string;wth_amt:number}};
+type Edit={savings:string;installment:string;withdrawalType:string;withdrawal:string;notes:string};
 
-export default function CombinedCollectionScreen() {
-  const colors = useThemeStore((s) => s.colors);
-  const [client, setClient] = useState<Client | null>(null);
-  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [savings, setSavings] = useState('');
-  const [loanAmount, setLoanAmount] = useState('');
-  const [withdrawalAmount, setWithdrawalAmount] = useState('');
-  const [withdrawalType, setWithdrawalType] = useState<'cash' | 'withdrawal' | 'return'>('cash');
-  const [notes, setNotes] = useState('');
-  const [date, setDate] = useState(today());
-  const [loadingClient, setLoadingClient] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+export default function CombinedCollectionScreen(){
+ const colors=useThemeStore(s=>s.colors);
+ const [date,setDate]=useState(today()); const [clients,setClients]=useState<Client[]>([]); const [unions,setUnions]=useState<string[]>([]); const [activeUnion,setActiveUnion]=useState('');
+ const [rows,setRows]=useState<Row[]>([]); const [edits,setEdits]=useState<Record<string,Edit>>({}); const [query,setQuery]=useState(''); const [loading,setLoading]=useState(true); const [loadingRows,setLoadingRows]=useState(false); const [saving,setSaving]=useState(false); const [refreshing,setRefreshing]=useState(false);
 
-  const activeLoan = useMemo(() => loans.find((l) => l.status !== 'completed' && Number(l.remaining_balance) > 0) || loans[0], [loans]);
-  const installmentAmount = activeLoan?.total_payable && activeLoan?.num_installments
-    ? Number(activeLoan.total_payable) / Number(activeLoan.num_installments)
-    : 0;
-  const paidInstallments = activeLoan && installmentAmount > 0
-    ? Math.max(0, Math.floor((Number(activeLoan.total_payable || 0) - Number(activeLoan.remaining_balance || 0)) / installmentAmount))
-    : 0;
+ const loadUnions=useCallback(async()=>{setLoading(true);try{const res=await api.getClients({limit:100,offset:0});const active=(res.data||[]).filter((c:any)=>String(c.status||'').toLowerCase()==='active');setClients(active);const names=Array.from(new Set(active.map((c:any)=>{const n=String(c.union||'').trim();return n||'Unassigned'}))).sort((a,b)=>a.localeCompare(b));setUnions(names);if(names.length&&!activeUnion)setActiveUnion(names[0]);else if(activeUnion&&!names.includes(activeUnion))setActiveUnion(names[0]||'');}catch(e:any){Alert.alert('Unable to load clients',e?.message||'Please try again.');}finally{setLoading(false)}},[activeUnion]);
+ const loadUnion=useCallback(async()=>{if(!activeUnion)return;setLoadingRows(true);try{const data=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);setRows(data);setEdits(prev=>{const next={...prev};for(const r of data){if(!next[r.id])next[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):'',notes:''};}return next});}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.');}finally{setLoadingRows(false)}},[activeUnion,date]);
+ useFocusEffect(useCallback(()=>{loadUnions();},[loadUnions]));
+ useEffect(()=>{loadUnion();},[loadUnion]);
+ const refresh=async()=>{setRefreshing(true);await loadUnions();await loadUnion();setRefreshing(false)};
+ const filtered=useMemo(()=>rows.filter(r=>r.name.toLowerCase().includes(query.trim().toLowerCase())||r.id.toLowerCase().includes(query.trim().toLowerCase())),[rows,query]);
+ const setEdit=(id:string,key:keyof Edit,value:string)=>setEdits(p=>({...p,[id]:{...(p[id]||{savings:'',installment:'',withdrawalType:'',withdrawal:'',notes:''}),[key]:value}}));
+ const installmentAmount=(r:Row)=>{const l=r.loan;if(!l)return 0;const n=Number(l.num_installments)||23;return n>0?Number(l.total_payable||0)/n:0};
+ const paid=(r:Row)=>{const i=installmentAmount(r);return i>0?Math.floor((Number(r.loan?.total_payable||0)-Number(r.loan?.remaining_balance||0))/i):0};
+ const saveRow=async(r:Row)=>{const e=edits[r.id]||{savings:'',installment:'',withdrawalType:'',withdrawal:'',notes:''};const installment=Number(e.installment)||0;const savings=Number(e.savings.replace(/,/g,''))||0;const withdrawal=Number(e.withdrawal.replace(/,/g,''))||0;if(!installment&&!savings&&!withdrawal&&r.existing.loan_amt===0&&r.existing.sav_amt===0&&!r.existing.wth_type)return Alert.alert('No changes','Enter a collection amount first.');if(installment&&e.withdrawalType&&['withdrawal','return'].includes(e.withdrawalType))return Alert.alert('Invalid combination','Repayment and Deduct/Return cannot be processed together.');setSaving(true);try{const res=await api.saveCombinedCollection({client_id:r.id,date,installment,savings_amount:savings,withdrawal_type:e.withdrawalType,withdrawal_amount:withdrawal,notes:e.notes});if(!res?.success)throw new Error(res?.error||res?.message||'Unable to save collection.');Alert.alert('Saved',`${r.name}\n${res.message||'Collection processed successfully.'}`);await loadUnion();}catch(err:any){Alert.alert('Collection failed',err?.message||'Unable to save collection.');}finally{setSaving(false)}};
+ const resetRow=(r:Row)=>setEdits(p=>({...p,[r.id]:{savings:'',installment:'',withdrawalType:'',withdrawal:'',notes:''}}));
+ const autofill=()=>setEdits(p=>{const n={...p};for(const r of rows){const i=installmentAmount(r);if(i>0&&!r.existing.loan_amt)n[r.id]={...(n[r.id]||{savings:'',installment:'',withdrawalType:'',withdrawal:'',notes:''}),installment:'1'};}return n});
 
-  const loadClient = useCallback(async (selected: Client) => {
-    setLoadingClient(true);
-    setPortfolio(null);
-    setLoans([]);
-    try {
-      const [p, l] = await Promise.all([api.getPortfolio(selected.id), api.getLoans(selected.id)]);
-      setPortfolio(p);
-      setLoans(l);
-    } catch (e: any) {
-      Alert.alert('Unable to load client', e?.message || 'Please try again.');
-    } finally {
-      setLoadingClient(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (client) loadClient(client);
-  }, [client, loadClient]);
-
-  useFocusEffect(useCallback(() => {
-    setDate(today());
-  }, []));
-
-  const refresh = async () => {
-    if (!client) return;
-    setRefreshing(true);
-    await loadClient(client);
-    setRefreshing(false);
-  };
-
-  const setInstallments = (count: number) => {
-    if (!installmentAmount) return;
-    setLoanAmount(String(Math.round(installmentAmount * count)));
-  };
-
-  const submit = async () => {
-    if (!client) return Alert.alert('Client required', 'Select a client before saving a collection.');
-    const s = Number(savings.replace(/,/g, '')) || 0;
-    const l = Number(loanAmount.replace(/,/g, '')) || 0;
-    const w = Number(withdrawalAmount.replace(/,/g, '')) || 0;
-
-    if (s <= 0 && l <= 0 && w <= 0) return Alert.alert('Amount required', 'Enter savings, loan repayment or withdrawal amount.');
-    if (l > 0 && (withdrawalType === 'withdrawal' || withdrawalType === 'return')) {
-      return Alert.alert('Invalid combination', 'Loan repayment cannot be processed with Deduct or Return.');
-    }
-    if (l > 0 && activeLoan && l > Number(activeLoan.remaining_balance)) {
-      return Alert.alert('Amount too high', `Loan repayment cannot exceed ${money(activeLoan.remaining_balance)}.`);
-    }
-    if (withdrawalType !== 'cash' && w > 0 && w > Number(portfolio?.savings?.balance || 0)) {
-      return Alert.alert('Insufficient savings', `Available savings: ${money(portfolio?.savings?.balance)}.`);
-    }
-
-    setSaving(true);
-    try {
-      const results: string[] = [];
-      if (s > 0) {
-        const res = await api.collectSavings({ client_id: client.id, amount: s, notes: notes.trim() });
-        if (!res?.success) throw new Error(res?.error || 'Savings collection failed.');
-        results.push(`Savings ${money(s)}`);
-      }
-      if (l > 0) {
-        const res = await api.collectLoan({ client_id: client.id, amount: l, loan_id: activeLoan?.id, notes: notes.trim() });
-        if (!res?.success) throw new Error(res?.error || 'Loan repayment failed.');
-        results.push(`Loan ${money(l)}`);
-      }
-      if (w > 0) {
-        if (withdrawalType === 'cash') {
-          throw new Error('Cash withdrawal requires proof image and should be completed from Savings Withdrawal.');
-        }
-        const res = await api.withdrawSavings({ client_id: client.id, amount: w, reason: withdrawalType === 'return' ? 'Return (Payoff Loan)' : 'Withdrawal (Deduct)', notes: notes.trim() });
-        if (!res?.success) throw new Error(res?.error || 'Savings adjustment failed.');
-        results.push(`${withdrawalType === 'return' ? 'Return' : 'Deduct'} ${money(w)}`);
-      }
-
-      Alert.alert('Collection saved', `${client.name}\n\n${results.join('\n')}\n\nDate: ${date}`, [{ text: 'Done' }]);
-      setSavings('');
-      setLoanAmount('');
-      setWithdrawalAmount('');
-      setNotes('');
-      await loadClient(client);
-    } catch (e: any) {
-      Alert.alert('Collection failed', e?.message || 'Unable to save collection.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const field = (label: string, value: string, setValue: (v: string) => void, placeholder = '0') => (
-    <View style={styles.fieldWrap}>
-      <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <View style={[styles.amountBox, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-        <Text style={[styles.currency, { color: colors.textMuted }]}>₦</Text>
-        <TextInput
-          value={value}
-          onChangeText={setValue}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textMuted}
-          keyboardType="decimal-pad"
-          style={[styles.amountInput, { color: colors.text }]}
-        />
-      </View>
-    </View>
-  );
-
-  return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
-      >
-        <View style={[styles.topCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.topIcon}>
-            <Ionicons name="cash-outline" size={24} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: colors.text }]}>Combined Collection</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Savings, loan repayment and adjustments</Text>
-          </View>
-          <View style={styles.liveDot} />
-        </View>
-
-        <View style={[styles.dateCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.dateIcon}><Ionicons name="calendar-outline" size={18} color={colors.primary} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.miniLabel, { color: colors.textMuted }]}>COLLECTION DATE</Text>
-            <TextInput value={date} onChangeText={setDate} style={[styles.dateInput, { color: colors.text }]} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textMuted} />
-          </View>
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>1. Select Client</Text>
-        <ClientPicker selected={client} onSelect={setClient} />
-
-        {loadingClient && (
-          <View style={[styles.loadingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={{ color: colors.textSecondary }}>Loading client balances…</Text>
-          </View>
-        )}
-
-        {client && !loadingClient && (
-          <View style={[styles.clientCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.clientAvatar, { backgroundColor: colors.primary }]}><Text style={styles.avatarText}>{(client.name || '?')[0].toUpperCase()}</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.clientName, { color: colors.text }]} numberOfLines={1}>{client.name}</Text>
-              <Text style={[styles.clientMeta, { color: colors.textSecondary }]}>{client.id}{client.phone ? ` • ${client.phone}` : ''}</Text>
-            </View>
-            <Ionicons name="checkmark-circle" size={22} color="#10B981" />
-          </View>
-        )}
-
-        {client && (
-          <View style={styles.statsRow}>
-            <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Ionicons name="wallet-outline" size={17} color="#10B981" />
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>SAVINGS</Text>
-              <Text style={[styles.statValue, { color: colors.text }]}>{money(portfolio?.savings?.balance)}</Text>
-            </View>
-            <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Ionicons name="card-outline" size={17} color="#8B5CF6" />
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>LOAN BAL.</Text>
-              <Text style={[styles.statValue, { color: colors.text }]}>{money(activeLoan?.remaining_balance || portfolio?.loans?.outstanding)}</Text>
-            </View>
-          </View>
-        )}
-
-        {client && (
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>2. Collection Details</Text>
-            <View style={[styles.formCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              {field('SAVINGS COLLECTION', savings, setSavings)}
-
-              <View style={styles.divider} />
-              <View style={styles.loanHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>LOAN REPAYMENT</Text>
-                  <Text style={[styles.helper, { color: colors.textMuted }]}>
-                    {activeLoan ? `Installment ${paidInstallments + 1}${activeLoan.num_installments ? ` of ${activeLoan.num_installments}` : ''} • ${money(installmentAmount)} suggested` : 'No active loan found'}
-                  </Text>
-                </View>
-                <Ionicons name="card-outline" size={22} color="#8B5CF6" />
-              </View>
-
-              <View style={styles.quickRow}>
-                {[1, 2, 3].map((n) => (
-                  <Pressable key={n} onPress={() => setInstallments(n)} style={({ pressed }) => [styles.quickBtn, { backgroundColor: 'rgba(139,92,246,0.10)', borderColor: 'rgba(139,92,246,0.22)', opacity: pressed ? 0.7 : 1 }]}>
-                    <Text style={styles.quickText}>{n}×</Text>
-                    <Text style={[styles.quickSub, { color: colors.textSecondary }]}>{money(installmentAmount * n)}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              {field('PAYMENT AMOUNT', loanAmount, setLoanAmount)}
-
-              <View style={styles.divider} />
-              <View style={styles.loanHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>SAVINGS ADJUSTMENT</Text>
-                  <Text style={[styles.helper, { color: colors.textMuted }]}>Choose how the amount should be applied.</Text>
-                </View>
-                <Ionicons name="swap-vertical-outline" size={22} color="#F59E0B" />
-              </View>
-              <View style={[styles.segment, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-                {([
-                  ['cash', 'Cash'],
-                  ['withdrawal', 'Deduct'],
-                  ['return', 'Return'],
-                ] as const).map(([key, label]) => (
-                  <Pressable key={key} onPress={() => setWithdrawalType(key)} style={[styles.segmentItem, withdrawalType === key && { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Text style={[styles.segmentText, { color: withdrawalType === key ? colors.text : colors.textMuted }]}>{label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              {withdrawalType === 'cash' && <Text style={[styles.notice, { color: colors.textMuted }]}><Ionicons name="information-circle-outline" size={14} /> Cash withdrawal proof is handled in Savings Withdrawal.</Text>}
-              {field(withdrawalType === 'cash' ? 'CASH AMOUNT' : withdrawalType === 'return' ? 'RETURN AMOUNT' : 'DEDUCT AMOUNT', withdrawalAmount, setWithdrawalAmount)}
-
-              <View style={styles.divider} />
-              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>NOTES</Text>
-              <TextInput
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-                placeholder="Optional collection note…"
-                placeholderTextColor={colors.textMuted}
-                style={[styles.notes, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
-              />
-            </View>
-
-            <View style={[styles.totalCard, { backgroundColor: colors.primary }]}>
-              <View>
-                <Text style={styles.totalLabel}>TOTAL COLLECTION</Text>
-                <Text style={styles.totalValue}>{money((Number(savings.replace(/,/g, '')) || 0) + (Number(loanAmount.replace(/,/g, '')) || 0))}</Text>
-              </View>
-              <Ionicons name="receipt-outline" size={30} color="rgba(255,255,255,0.85)" />
-            </View>
-
-            <Pressable disabled={saving} onPress={submit} style={({ pressed }) => [styles.submit, { backgroundColor: '#10B981', opacity: saving ? 0.65 : pressed ? 0.82 : 1 }]}>
-              {saving ? <ActivityIndicator color="#fff" /> : <><Ionicons name="checkmark-circle-outline" size={21} color="#fff" /><Text style={styles.submitText}>SAVE COLLECTION</Text></>}
-            </Pressable>
-            <Text style={[styles.footerHint, { color: colors.textMuted }]}>Review the amounts before saving. Collections are recorded under the signed-in CO.</Text>
-          </>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
+ return <KeyboardAvoidingView style={{flex:1,backgroundColor:colors.background}} behavior={Platform.OS==='ios'?'padding':undefined}>
+  <ScrollView style={{flex:1}} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary}/>}>
+   <View style={[styles.hero,{backgroundColor:colors.card,borderColor:colors.border}]}><View style={[styles.heroIcon,{backgroundColor:colors.primary}]}><Ionicons name="layers-outline" size={24} color="#fff"/></View><View style={{flex:1}}><Text style={[styles.title,{color:colors.text}]}>Combined Collection</Text><Text style={[styles.sub,{color:colors.textSecondary}]}>Collect by union using the same workflow as CO PHP</Text></View><View style={styles.live}/></View>
+   <View style={[styles.controlCard,{backgroundColor:colors.card,borderColor:colors.border}]}><View style={styles.dateBox}><Ionicons name="calendar-outline" size={18} color={colors.primary}/><View style={{flex:1}}><Text style={[styles.caption,{color:colors.textMuted}]}>COLLECTION DATE</Text><TextInput value={date} onChangeText={setDate} style={[styles.dateInput,{color:colors.text}]} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textMuted}/></View></View><Pressable onPress={autofill} style={[styles.auto,{backgroundColor:'rgba(59,130,246,.10)'}]}><Ionicons name="flash-outline" size={16} color={colors.primary}/><Text style={[styles.autoText,{color:colors.primary}]}>AUTO-FILL</Text></Pressable></View>
+   <Text style={[styles.section,{color:colors.text}]}>UNION</Text>
+   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+    {unions.map(u=><Pressable key={u} onPress={()=>{setActiveUnion(u);setQuery('')}} style={[styles.tab,activeUnion===u&&{backgroundColor:colors.primary,borderColor:colors.primary}]}><Text style={[styles.tabText,{color:activeUnion===u?'#fff':colors.textSecondary}]}>{u}</Text></Pressable>)}
+   </ScrollView>
+   <View style={[styles.toolbar,{backgroundColor:colors.card,borderColor:colors.border}]}><View style={styles.count}><Ionicons name="people-outline" size={17} color={colors.primary}/><Text style={[styles.countText,{color:colors.text}]}>{rows.length} active clients</Text></View><View style={[styles.search,{backgroundColor:colors.inputBg,borderColor:colors.inputBorder}]}><Ionicons name="search-outline" size={16} color={colors.textMuted}/><TextInput value={query} onChangeText={setQuery} placeholder="Search client" placeholderTextColor={colors.textMuted} style={[styles.searchInput,{color:colors.text}]}/></View></View>
+   {loading||loadingRows?<View style={[styles.loading,{backgroundColor:colors.card,borderColor:colors.border}]}><ActivityIndicator color={colors.primary}/><Text style={{color:colors.textSecondary}}>Loading {activeUnion||'clients'}…</Text></View>:!activeUnion?<View style={[styles.empty,{backgroundColor:colors.card,borderColor:colors.border}]}><Ionicons name="people-outline" size={30} color={colors.textMuted}/><Text style={[styles.emptyTitle,{color:colors.text}]}>No assigned unions</Text><Text style={{color:colors.textSecondary}}>No active clients are assigned to this CO.</Text></View>:filtered.length===0?<View style={[styles.empty,{backgroundColor:colors.card,borderColor:colors.border}]}><Ionicons name="search-outline" size={30} color={colors.textMuted}/><Text style={[styles.emptyTitle,{color:colors.text}]}>No clients found</Text><Text style={{color:colors.textSecondary}}>Try another search or union.</Text></View>:
+   <ScrollView horizontal showsHorizontalScrollIndicator persistentScrollbar contentContainerStyle={{paddingBottom:12}}><View style={[styles.table,{borderColor:colors.border,backgroundColor:colors.card}]}>
+    <View style={[styles.tr,styles.headerRow,{backgroundColor:colors.inputBg,borderBottomColor:colors.border}]}><View style={[styles.clientCol,styles.cell]}><Text style={[styles.head,{color:colors.textSecondary}]}>CLIENT</Text></View><View style={[styles.loanCol,styles.cell]}><Text style={[styles.head,{color:'#9333EA'}]}>LOAN REPAYMENT</Text></View><View style={[styles.savCol,styles.cell]}><Text style={[styles.head,{color:'#16A34A'}]}>SAVINGS</Text></View><View style={[styles.wthCol,styles.cell]}><Text style={[styles.head,{color:'#DC2626'}]}>ADJUSTMENT</Text></View><View style={[styles.actionCol,styles.cell]}><Text style={[styles.head,{color:colors.textSecondary}]}>ACTION</Text></View></View>
+    {filtered.map(r=>{const e=edits[r.id]||{savings:'',installment:'',withdrawalType:'',withdrawal:'',notes:''};const inst=installmentAmount(r);const hasLoan=!!r.loan;return <View key={r.id} style={[styles.tr,{borderBottomColor:colors.border}]}>
+      <View style={[styles.clientCol,styles.cell]}><Text style={[styles.clientName,{color:colors.text}]} numberOfLines={1}>{r.name}</Text><Text style={[styles.meta,{color:colors.textMuted}]}>{r.id}</Text><View style={styles.balance}><Text style={[styles.small,{color:colors.textSecondary}]}>Savings <Text style={{fontWeight:'700'}}>{money(r.savings_balance)}</Text></Text><Text style={[styles.small,{color:'#9333EA'}]}>Loan <Text style={{fontWeight:'700'}}>{money(r.loan?.remaining_balance)}</Text></Text>{r.existing.sav_amt>0&&<Text style={[styles.small,{color:'#16A34A'}]}>Today +{money(r.existing.sav_amt)}</Text>}{r.existing.loan_amt>0&&<Text style={[styles.small,{color:'#9333EA'}]}>Paid {money(r.existing.loan_amt)}</Text>}</View></View>
+      <View style={[styles.loanCol,styles.cell]}>{hasLoan?<><Text style={[styles.loanInfo,{color:'#9333EA'}]}>{money(inst)} / installment</Text><Text style={[styles.small,{color:colors.textMuted}]}>Paid {paid(r)}{r.loan?.num_installments?` of ${r.loan.num_installments}`:''}</Text><View style={styles.stepRow}>{[1,2,3].map(n=><Pressable key={n} onPress={()=>setEdit(r.id,'installment',String(n))} style={[styles.step,e.installment===String(n)&&{backgroundColor:'#9333EA'}]}><Text style={[styles.stepText,{color:e.installment===String(n)?'#fff':'#9333EA'}]}>{n}×</Text></Pressable>)}</View><TextInput value={e.installment} onChangeText={v=>setEdit(r.id,'installment',v.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.textMuted} style={[styles.input,{color:colors.text,borderColor:'rgba(147,51,234,.25)',backgroundColor:colors.inputBg}]}/></>:<Text style={[styles.small,{color:colors.textMuted}]}>No active loan</Text>}</View>
+      <View style={[styles.savCol,styles.cell]}><TextInput value={e.savings} onChangeText={v=>setEdit(r.id,'savings',v)} keyboardType="decimal-pad" placeholder={r.existing.sav_amt?String(r.existing.sav_amt):'0'} placeholderTextColor={colors.textMuted} style={[styles.input,{color:colors.text,borderColor:'rgba(22,163,74,.28)',backgroundColor:colors.inputBg}]}/><Text style={[styles.small,{color:colors.textMuted}]}>Balance {money(r.savings_balance)}</Text></View>
+      <View style={[styles.wthCol,styles.cell]}><View style={styles.typeRow}>{[['','None'],['withdrawal','Deduct'],['return','Return']].map(([k,l])=><Pressable key={k} onPress={()=>setEdit(r.id,'withdrawalType',k)} style={[styles.typeBtn,e.withdrawalType===k&&{backgroundColor:'#DC2626'}]}><Text style={[styles.typeText,{color:e.withdrawalType===k?'#fff':colors.textSecondary}]}>{l}</Text></Pressable>)}</View><TextInput value={e.withdrawal} onChangeText={v=>setEdit(r.id,'withdrawal',v)} keyboardType="decimal-pad" placeholder={r.existing.wth_amt?String(r.existing.wth_amt):'0'} placeholderTextColor={colors.textMuted} style={[styles.input,{color:colors.text,borderColor:'rgba(220,38,38,.25)',backgroundColor:colors.inputBg}]}/><TextInput value={e.notes} onChangeText={v=>setEdit(r.id,'notes',v)} placeholder="Note" placeholderTextColor={colors.textMuted} style={[styles.input,{color:colors.text,borderColor:colors.inputBorder,backgroundColor:colors.inputBg,marginTop:6}]}/></View>
+      <View style={[styles.actionCol,styles.cell]}><Pressable disabled={saving} onPress={()=>saveRow(r)} style={[styles.saveBtn,{backgroundColor:'#22C55E',opacity:saving?.6:1}]}><Ionicons name="checkmark" size={17} color="#fff"/><Text style={styles.saveText}>SAVE</Text></Pressable><Pressable onPress={()=>resetRow(r)} style={styles.reset}><Ionicons name="refresh-outline" size={15} color={colors.textMuted}/><Text style={[styles.resetText,{color:colors.textMuted}]}>Reset</Text></Pressable></View>
+    </View>})}
+   </View></ScrollView>}
+   <View style={[styles.legend,{backgroundColor:colors.card,borderColor:colors.border}]}><View><Text style={[styles.legendTitle,{color:colors.text}]}>PHP workflow</Text><Text style={[styles.legendText,{color:colors.textSecondary}]}>Active CO clients • selected union • selected date • existing transactions • loan installment calculation • savings balance.</Text></View><Ionicons name="shield-checkmark-outline" size={24} color={colors.primary}/></View>
+  </ScrollView>
+ </KeyboardAvoidingView>
 }
-
-const styles = StyleSheet.create({
-  content: { padding: SPACING.md, paddingBottom: 48 },
-  topCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.lg, padding: 14, marginBottom: 10 },
-  topIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  title: { fontSize: 18, fontWeight: '800' },
-  subtitle: { fontSize: 12, marginTop: 3 },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
-  dateCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md, padding: 10, marginBottom: 18 },
-  dateIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(59,130,246,0.10)', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  miniLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 0.7 },
-  dateInput: { fontSize: 14, fontWeight: '700', padding: 0, marginTop: 2 },
-  sectionTitle: { fontSize: 14, fontWeight: '800', marginBottom: 9, marginTop: 2 },
-  loadingCard: { borderWidth: 1, borderRadius: RADIUS.md, padding: 18, alignItems: 'center', gap: 8, marginBottom: 12 },
-  clientCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md, padding: 12, marginBottom: 10 },
-  clientAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 11 },
-  avatarText: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  clientName: { fontSize: 15, fontWeight: '800' },
-  clientMeta: { fontSize: 11, marginTop: 3 },
-  statsRow: { flexDirection: 'row', gap: 9, marginBottom: 18 },
-  statBox: { flex: 1, borderWidth: 1, borderRadius: RADIUS.md, padding: 11 },
-  statLabel: { fontSize: 9, fontWeight: '800', marginTop: 6 },
-  statValue: { fontSize: 15, fontWeight: '800', marginTop: 2 },
-  formCard: { borderWidth: 1, borderRadius: RADIUS.lg, padding: 14 },
-  fieldWrap: { marginBottom: 12 },
-  fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5, marginBottom: 7 },
-  amountBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, minHeight: 52, paddingHorizontal: 13 },
-  currency: { fontSize: 18, fontWeight: '800', marginRight: 7 },
-  amountInput: { flex: 1, fontSize: 18, fontWeight: '700', paddingVertical: 10 },
-  divider: { height: 1, backgroundColor: 'rgba(127,127,127,0.16)', marginVertical: 5, marginBottom: 15 },
-  loanHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  helper: { fontSize: 11, marginTop: 2 },
-  quickRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  quickBtn: { flex: 1, borderWidth: 1, borderRadius: 11, paddingVertical: 9, alignItems: 'center' },
-  quickText: { color: '#7C3AED', fontSize: 15, fontWeight: '800' },
-  quickSub: { fontSize: 9, marginTop: 2 },
-  segment: { flexDirection: 'row', borderWidth: 1, borderRadius: 11, padding: 3, marginBottom: 9 },
-  segmentItem: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: 'transparent' },
-  segmentText: { fontSize: 12, fontWeight: '700' },
-  notice: { fontSize: 10, marginBottom: 8, lineHeight: 15 },
-  notes: { minHeight: 74, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, textAlignVertical: 'top', fontSize: 14 },
-  totalCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: RADIUS.lg, padding: 16, marginTop: 12 },
-  totalLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-  totalValue: { color: '#fff', fontSize: 25, fontWeight: '900', marginTop: 3 },
-  submit: { minHeight: 54, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 10 },
-  submitText: { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
-  footerHint: { textAlign: 'center', fontSize: 10, lineHeight: 15, marginTop: 10, paddingHorizontal: 15 },
-});
+const styles=StyleSheet.create({content:{padding:SPACING.md,paddingBottom:50},hero:{flexDirection:'row',alignItems:'center',borderWidth:1,borderRadius:RADIUS.lg,padding:14,marginBottom:10},heroIcon:{width:44,height:44,borderRadius:14,alignItems:'center',justifyContent:'center',marginRight:12},title:{fontSize:19,fontWeight:'800'},sub:{fontSize:12,marginTop:3},live:{width:9,height:9,borderRadius:5,backgroundColor:'#22C55E'},controlCard:{flexDirection:'row',alignItems:'center',borderWidth:1,borderRadius:RADIUS.lg,padding:10,marginBottom:12},dateBox:{flex:1,flexDirection:'row',alignItems:'center',gap:9},caption:{fontSize:9,fontWeight:'800',letterSpacing:.6},dateInput:{fontSize:14,fontWeight:'700',paddingVertical:2},auto:{flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:11,paddingVertical:9,borderRadius:12},autoText:{fontSize:10,fontWeight:'800'},section:{fontSize:11,fontWeight:'800',letterSpacing:.8,marginBottom:7},tabs:{gap:7,paddingBottom:10},tab:{paddingHorizontal:14,paddingVertical:9,borderRadius:99,borderWidth:1,borderColor:'#E5E7EB'},tabText:{fontSize:11,fontWeight:'800'},toolbar:{flexDirection:'row',alignItems:'center',gap:10,borderWidth:1,borderRadius:RADIUS.lg,padding:9,marginBottom:10},count:{flexDirection:'row',alignItems:'center',gap:6,flex:1},countText:{fontSize:12,fontWeight:'800'},search:{width:150,flexDirection:'row',alignItems:'center',gap:6,borderWidth:1,borderRadius:12,paddingHorizontal:9},searchInput:{flex:1,fontSize:11,paddingVertical:8},loading:{minHeight:180,borderWidth:1,borderRadius:RADIUS.lg,alignItems:'center',justifyContent:'center',gap:10},empty:{minHeight:180,borderWidth:1,borderRadius:RADIUS.lg,alignItems:'center',justifyContent:'center',padding:24,gap:6},emptyTitle:{fontSize:15,fontWeight:'800'},table:{borderWidth:1,borderRadius:RADIUS.lg,overflow:'hidden',minWidth:1030},tr:{flexDirection:'row',borderBottomWidth:1},headerRow:{minHeight:48},cell:{padding:10,justifyContent:'flex-start'},clientCol:{width:235},loanCol:{width:230},savCol:{width:165},wthCol:{width:245},actionCol:{width:110},head:{fontSize:9,fontWeight:'900',letterSpacing:.5},clientName:{fontSize:13,fontWeight:'800',maxWidth:205},meta:{fontSize:9,marginTop:2},balance:{marginTop:7,padding:7,borderRadius:9,borderWidth:1,borderColor:'#E5E7EB'},small:{fontSize:9,marginTop:3},loanInfo:{fontSize:11,fontWeight:'800'},stepRow:{flexDirection:'row',gap:5,marginVertical:7},step:{width:34,height:30,borderRadius:8,borderWidth:1,borderColor:'#9333EA',alignItems:'center',justifyContent:'center'},stepText:{fontSize:10,fontWeight:'900'},input:{borderWidth:1,borderRadius:9,minHeight:38,paddingHorizontal:9,fontSize:12,fontWeight:'700'},typeRow:{flexDirection:'row',gap:4,marginBottom:7},typeBtn:{paddingHorizontal:8,paddingVertical:7,borderRadius:8},typeText:{fontSize:9,fontWeight:'800'},saveBtn:{height:38,borderRadius:10,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:4},saveText:{color:'#fff',fontSize:10,fontWeight:'900'},reset:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:3,paddingTop:9},resetText:{fontSize:9,fontWeight:'700'},legend:{marginTop:12,borderWidth:1,borderRadius:RADIUS.lg,padding:12,flexDirection:'row',alignItems:'center',gap:10},legendTitle:{fontSize:12,fontWeight:'800'},legendText:{fontSize:10,lineHeight:15,marginTop:3}}
+);
