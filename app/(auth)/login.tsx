@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView,
-  Platform, ActivityIndicator, Alert, ScrollView, Dimensions,
+  Platform, ActivityIndicator, Alert, ScrollView, Dimensions, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import { useThemeStore } from '../../src/store/theme';
 import { SPACING, RADIUS } from '../../src/constants/config';
 
 const { width } = Dimensions.get('window');
+const CUPAD_LOGO = 'https://cupad.name.ng/uploads/CUPAD%20LOGO.png';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -40,13 +41,11 @@ export default function LoginScreen() {
       Alert.alert('Fingerprint unavailable', 'Fingerprint authentication is available in the Android and iOS app.');
       return;
     }
-
     setBiometricLoading(true);
     clearError();
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
-
       if (!hasHardware) {
         Alert.alert('Unavailable', 'This device does not support biometric authentication.');
         return;
@@ -55,22 +54,16 @@ export default function LoginScreen() {
         Alert.alert('Fingerprint not set up', 'Set up a fingerprint or other biometric on your device first.');
         return;
       }
-
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Sign in to CUPAD',
         cancelLabel: 'Cancel',
         disableDeviceFallback: false,
         fallbackLabel: 'Use device passcode',
       });
-
       if (!result.success) return;
-
       const success = await biometricLogin();
-      if (success) {
-        router.replace('/(tabs)');
-      } else {
-        Alert.alert('Sign in again', 'Your saved session is no longer available. Sign in with your username and password once, then fingerprint login will be available again.');
-      }
+      if (success) router.replace('/(tabs)');
+      else Alert.alert('Sign in again', 'Your saved session is no longer available. Sign in with your username and password once, then fingerprint login will be available again.');
     } catch (e: any) {
       Alert.alert('Fingerprint login failed', e?.message || 'Please sign in with your username and password.');
     } finally {
@@ -94,8 +87,8 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.logoArea}>
-            <View style={[styles.logoCircle, { backgroundColor: colors.glowBlue, borderColor: colors.primary + '25' }]}>
-              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={styles.logoGradient}><Ionicons name="people" size={34} color="#fff" /></LinearGradient>
+            <View style={[styles.logoCircle, { backgroundColor: colors.card, borderColor: colors.primary + '25' }]}>
+              <Image source={{ uri: CUPAD_LOGO }} style={styles.logoImage} resizeMode="contain" />
             </View>
             <Text style={[styles.welcome, { color: colors.text }]}>Welcome back</Text>
             <Text style={[styles.subheading, { color: colors.textSecondary }]}>Sign in securely to manage your CUPAD field activities.</Text>
@@ -140,23 +133,13 @@ export default function LoginScreen() {
                   {isLoading ? <><ActivityIndicator color="#fff" /><Text style={styles.loginBtnText}>Signing in…</Text></> : <><Text style={styles.loginBtnText}>Sign in</Text><Ionicons name="arrow-forward" size={19} color="#fff" /></>}
                 </LinearGradient>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleFingerprint}
-                disabled={isLoading || biometricLoading}
-                style={[styles.biometricBtn, { backgroundColor: colors.infoBg, borderColor: colors.primary + '35', opacity: isLoading || biometricLoading ? 0.6 : 1 }]}
-                accessibilityRole="button"
-                accessibilityLabel="Sign in with fingerprint or device biometric"
-              >
+              <TouchableOpacity activeOpacity={0.85} onPress={handleFingerprint} disabled={isLoading || biometricLoading} style={[styles.biometricBtn, { backgroundColor: colors.infoBg, borderColor: colors.primary + '35', opacity: isLoading || biometricLoading ? 0.6 : 1 }]} accessibilityRole="button" accessibilityLabel="Sign in with fingerprint or device biometric">
                 {biometricLoading ? <ActivityIndicator color={colors.primary} /> : <Ionicons name="finger-print-outline" size={25} color={colors.primary} />}
               </TouchableOpacity>
             </View>
-
             <Text style={[styles.biometricHint, { color: colors.textMuted }]}>Use fingerprint or device biometric for quick sign-in</Text>
             <View style={styles.securityRow}><Ionicons name="lock-closed" size={13} color={colors.success} /><Text style={[styles.securityText, { color: colors.textMuted }]}>Your login is protected and securely transmitted</Text></View>
           </View>
-
           <View style={styles.footerBlock}><Text style={[styles.motto, { color: colors.primary }]}>SUCCESS IS OURS</Text><Text style={[styles.footer, { color: colors.textMuted }]}>CUPAD Staff Portal • © 2026</Text></View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -172,7 +155,7 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 },
   topBrand: { fontSize: 16, fontWeight: '800', letterSpacing: 1 }, topBrandSub: { fontSize: 9, fontWeight: '700', letterSpacing: 1.4, marginTop: 2 },
   iconBtn: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
-  logoArea: { alignItems: 'center', marginBottom: 28 }, logoCircle: { width: 92, height: 92, borderRadius: 46, justifyContent: 'center', alignItems: 'center', borderWidth: 1, marginBottom: 18 }, logoGradient: { width: 68, height: 68, borderRadius: 34, justifyContent: 'center', alignItems: 'center' },
+  logoArea: { alignItems: 'center', marginBottom: 28 }, logoCircle: { width: 104, height: 104, borderRadius: 52, justifyContent: 'center', alignItems: 'center', borderWidth: 1, marginBottom: 18, padding: 10, overflow: 'hidden' }, logoImage: { width: 84, height: 84 },
   welcome: { fontSize: 27, fontWeight: '800', textAlign: 'center' }, subheading: { fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6, maxWidth: 350 },
   card: { borderRadius: RADIUS.lg, padding: SPACING.lg, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 5 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }, heading: { fontSize: 21, fontWeight: '800' }, cardHint: { fontSize: 12, marginTop: 4 }, secureBadge: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
