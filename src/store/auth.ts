@@ -32,7 +32,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ error: res.error || 'Invalid credentials', isLoading: false, isAuthenticated: false });
       return false;
     } catch (e: any) {
-      const message = e?.response?.data?.error || e?.message || 'Network error. Please try again.';
+      const message = e?.message || e?.response?.data?.error || 'Network error. Please try again.';
       set({ error: message, isLoading: false, isAuthenticated: false });
       return false;
     }
@@ -91,8 +91,24 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   updateUser: async (payload) => {
     const updated = await api.updateProfile(payload);
-    set({ user: updated, error: null });
-    return updated;
+    // Keep existing authenticated data such as resolved location names when
+    // an older API response does not include those fields.
+    const current = useAuthStore.getState().user;
+    const merged: User = { ...(current || {}), ...updated } as User;
+    set({ user: merged, error: null });
+
+    // Re-fetch /me so Header, Profile and Dashboard all use the same server state.
+    try {
+      const fresh = await api.me();
+      if (fresh) {
+        const latest: User = { ...merged, ...fresh } as User;
+        set({ user: latest, error: null });
+        return latest;
+      }
+    } catch {
+      // The successful update is still retained locally.
+    }
+    return merged;
   },
 
   clearError: () => set({ error: null }),
