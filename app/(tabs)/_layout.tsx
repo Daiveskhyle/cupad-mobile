@@ -7,7 +7,7 @@ import { getRoleConfig } from '../../src/constants/roles';
 import { API_BASE_URL } from '../../src/constants/config';
 
 const CUPAD_LOGO = 'https://cupad.name.ng/uploads/CUPAD%20LOGO.png';
-const NAV_BLUE = '#1976D2';
+const NAV_BLUE = '#3B82F6';
 
 export default function TabsLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -54,23 +54,28 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginTop: 1 },
         tabBarItemStyle: { paddingVertical: 1 },
-        headerStyle: { backgroundColor: NAV_BLUE, elevation: 0, shadowOpacity: 0, height: 62 },
-        headerTintColor: '#fff',
+        headerStyle: {
+          backgroundColor: '#FFFFFF',
+          elevation: 0,
+          shadowOpacity: 0,
+          height: 62,
+          borderBottomWidth: 1,
+          borderBottomColor: '#E5E7EB',
+        },
+        headerTintColor: NAV_BLUE,
         headerTitleAlign: 'left',
-        headerTitleStyle: { fontWeight: '800', fontSize: 17 },
+        headerTitleStyle: { fontWeight: '700', fontSize: 17, color: NAV_BLUE },
         headerTitle: () => null,
         headerLeft: () => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 14, gap: 9 }}>
-            <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              <Image source={{ uri: CUPAD_LOGO }} style={{ width: 34, height: 34 }} resizeMode="contain" />
-            </View>
-            <Text style={{ color: '#fff', fontSize: 19, fontWeight: '900', letterSpacing: 0.5 }}>CUPAD</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 14, gap: 8 }}>
+            <Image source={{ uri: CUPAD_LOGO }} style={{ width: 32, height: 32 }} resizeMode="contain" />
+            <Text style={{ color: NAV_BLUE, fontSize: 20, fontWeight: '800', letterSpacing: 0.2 }}>CUPAD</Text>
           </View>
         ),
         headerRight: () => (
-          <Pressable onPress={() => router.push('/(tabs)/profile')} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12, gap: 7 }} accessibilityRole="button" accessibilityLabel="Open profile">
-            <View style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.78)', backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {profileUri ? <Image source={{ uri: profileUri }} style={{ width: '100%', height: '100%' }} /> : <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>{initials}</Text>}
+          <Pressable onPress={() => router.push('/(tabs)/profile')} style={{ marginRight: 12 }} accessibilityRole="button" accessibilityLabel="Open profile">
+            <View style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: NAV_BLUE, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {profileUri ? <Image source={{ uri: profileUri }} style={{ width: '100%', height: '100%' }} /> : <Text style={{ color: NAV_BLUE, fontSize: 13, fontWeight: '800' }}>{initials}</Text>}
             </View>
           </Pressable>
         ),
