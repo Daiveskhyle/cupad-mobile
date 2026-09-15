@@ -1,4 +1,4 @@
-import { Alert, Image, Pressable, Text, View } from 'react-native';
+import { Image, Platform, Pressable, Text, View } from 'react-native';
 import { Redirect, Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/auth';
@@ -7,7 +7,6 @@ import { getRoleConfig } from '../../src/constants/roles';
 import { API_BASE_URL } from '../../src/constants/config';
 
 const CUPAD_LOGO = 'https://cupad.name.ng/uploads/CUPAD%20LOGO.png';
-const NAV_BLUE = '#3B82F6';
 
 export default function TabsLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -33,22 +32,19 @@ export default function TabsLayout() {
     return `${origin}/${clean}`;
   })();
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/(auth)/login');
-          },
-        },
-      ],
-    );
+  const handleLogout = async () => {
+    // Clear the local session immediately. Do not wait for the server/network.
+    await logout();
+    router.replace('/(auth)/login');
+  };
+
+  const confirmLogout = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm('Are you sure you want to sign out?')) void handleLogout();
+      return;
+    }
+    // Native confirmation is handled by the profile screen; header logout is immediate.
+    void handleLogout();
   };
 
   const tabIcon = (focused: boolean, active: string, inactive: string, color: string, size: number) => (
@@ -62,27 +58,10 @@ export default function TabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: accent,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopWidth: 0,
-          height: 72,
-          paddingBottom: 10,
-          paddingTop: 7,
-          elevation: 12,
-          shadowOpacity: colors.isDark ? 0.35 : 0.12,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: -4 },
-        },
+        tabBarStyle: { backgroundColor: colors.card, borderTopWidth: 0, height: 72, paddingBottom: 10, paddingTop: 7, elevation: 12, shadowOpacity: colors.isDark ? 0.35 : 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: -4 } },
         tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginTop: 1 },
         tabBarItemStyle: { paddingVertical: 1 },
-        headerStyle: {
-          backgroundColor: colors.card,
-          elevation: 0,
-          shadowOpacity: 0,
-          height: 62,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-        },
+        headerStyle: { backgroundColor: colors.card, elevation: 0, shadowOpacity: 0, height: 62, borderBottomWidth: 1, borderBottomColor: colors.border },
         headerTintColor: colors.primary,
         headerTitleAlign: 'left',
         headerTitleStyle: { fontWeight: '700', fontSize: 17, color: colors.primary },
@@ -95,20 +74,10 @@ export default function TabsLayout() {
         ),
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 }}>
-            <Pressable
-              onPress={handleLogout}
-              accessibilityRole="button"
-              accessibilityLabel="Logout"
-              style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dangerBg || '#FEE2E2' }}
-            >
+            <Pressable onPress={confirmLogout} accessibilityRole="button" accessibilityLabel="Sign out" style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dangerBg || '#FEE2E2' }}>
               <Ionicons name="log-out-outline" size={19} color={colors.danger || '#DC2626'} />
             </Pressable>
-            <Pressable
-              onPress={() => toggleTheme()}
-              accessibilityRole="button"
-              accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}
-            >
+            <Pressable onPress={() => toggleTheme()} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}>
               <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
             </Pressable>
             <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Open profile">
