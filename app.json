@@ -18,8 +18,8 @@
       "bundleIdentifier": "ng.name.cupad.mobile"
     },
     "android": {
+      "icon": "./assets/icon.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#3B82F6"
       },
       "package": "ng.name.cupad.mobile"
@@ -37,7 +37,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "https://cupad.name.ng/api/v1",
+      "apiBaseUrl": "https://cupad.com.ng/api/v1",
       "router": {
         "origin": false
       }
