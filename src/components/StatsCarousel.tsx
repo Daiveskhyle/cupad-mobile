@@ -18,7 +18,9 @@ const CARD_GAP = 12;
 
 export default function StatsCarousel({ items }: Props) {
   const { width: screenWidth } = useWindowDimensions();
-  const cardWidth = Math.max(0, screenWidth - SPACING.md * 2);
+  // Dashboard content already has horizontal padding, so reserve another
+  // SPACING.md on both sides inside the carousel to keep every card fully visible.
+  const cardWidth = Math.max(0, screenWidth - SPACING.md * 4);
   const snapInterval = cardWidth + CARD_GAP;
 
   return (
@@ -26,7 +28,7 @@ export default function StatsCarousel({ items }: Props) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingRight: SPACING.md }]}
+        contentContainerStyle={styles.content}
         decelerationRate="fast"
         snapToAlignment="start"
         snapToInterval={snapInterval}
@@ -47,9 +49,9 @@ export default function StatsCarousel({ items }: Props) {
               <Text style={styles.index}>{index + 1}/{items.length}</Text>
             </View>
 
-            <View>
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit>{item.value}</Text>
+            <View style={styles.statBody}>
+              <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+              <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{item.value}</Text>
             </View>
 
             <View style={styles.bottomRow}>
@@ -76,12 +78,16 @@ export default function StatsCarousel({ items }: Props) {
 
 const styles = StyleSheet.create({
   wrapper: { marginBottom: SPACING.md },
-  content: { paddingLeft: SPACING.md },
+  content: {
+    paddingHorizontal: SPACING.md,
+  },
   card: {
     minHeight: 168,
     borderRadius: RADIUS.lg,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
     justifyContent: 'space-between',
+    overflow: 'hidden',
   },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconCircle: {
@@ -92,10 +98,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  statBody: {
+    flex: 1,
+    justifyContent: 'center',
+    minWidth: 0,
+  },
   index: { color: 'rgba(255,255,255,0.78)', fontSize: 12, fontWeight: '800' },
-  title: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '700', marginTop: 18 },
+  title: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '700', marginTop: 14 },
   value: { color: '#fff', fontSize: 30, fontWeight: '900', marginTop: 4 },
-  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
   swipeHint: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
   dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, marginTop: 9 },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#CBD5E1' },
