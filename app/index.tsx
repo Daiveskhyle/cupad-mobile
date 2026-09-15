@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '../src/store/auth';
@@ -13,16 +13,13 @@ export default function Index() {
   const logoY = useRef(new Animated.Value(18)).current;
   const contentY = useRef(new Animated.Value(18)).current;
   const progress = useRef(new Animated.Value(0)).current;
-  const [finished, setFinished] = require('react').useState(false);
+  const [finished, setFinished] = useState(false);
 
   useEffect(() => {
     if (isLoading || !themeReady) return;
 
     const animation = Animated.parallel([
-      Animated.sequence([
-        Animated.delay(100),
-        Animated.timing(opacity, { toValue: 1, duration: 650, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ]),
+      Animated.timing(opacity, { toValue: 1, duration: 650, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.spring(scale, { toValue: 1, speed: 12, bounciness: 7, useNativeDriver: true }),
       Animated.timing(logoY, { toValue: 0, duration: 650, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.timing(contentY, { toValue: 0, duration: 750, delay: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
