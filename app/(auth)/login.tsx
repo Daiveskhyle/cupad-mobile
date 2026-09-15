@@ -1,7 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView,
-  Platform, ActivityIndicator, Alert, ScrollView, Dimensions, Image,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Dimensions,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,23 +23,50 @@ import { SPACING, RADIUS } from '../../src/constants/config';
 
 const { width } = Dimensions.get('window');
 
+type Field = 'username' | 'password' | null;
+
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [focused, setFocused] = useState<'username' | 'password' | null>(null);
+  const [focused, setFocused] = useState<Field>(null);
   const [biometricLoading, setBiometricLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+
+  const passwordRef = useRef<TextInput>(null);
+  const usernameRef = useRef<TextInput>(null);
 
   const { login, isLoading, error, clearError, biometricLogin } = useAuthStore();
   const { colors, mode, toggle } = useThemeStore();
+
+  useEffect(() => {
+    let mounted = true;
+    const checkBiometrics = async () => {
+      if (Platform.OS === 'web') return;
+      try {
+        const hardware = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        if (mounted) setBiometricAvailable(hardware && enrolled);
+      } catch {
+        if (mounted) setBiometricAvailable(false);
+      }
+    };
+    checkBiometrics();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleLogin = async () => {
     const cleanUsername = username.trim();
     if (!cleanUsername || !password) {
       Alert.alert('Missing details', 'Enter your username and password to continue.');
+      if (!cleanUsername) usernameRef.current?.focus();
+      else passwordRef.current?.focus();
       return;
     }
+
     clearError();
     const success = await login(cleanUsername, password);
     if (success) router.replace('/(tabs)');
@@ -37,57 +74,109 @@ export default function LoginScreen() {
 
   const handleFingerprint = async () => {
     if (Platform.OS === 'web') {
-      Alert.alert('Fingerprint unavailable', 'Fingerprint authentication is available in the Android and iOS app.');
+      Alert.alert('Biometric sign-in', 'Fingerprint authentication is available in the Android and iOS app.');
       return;
     }
+
     setBiometricLoading(true);
     clearError();
+
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
+
       if (!hasHardware) {
+        setBiometricAvailable(false);
         Alert.alert('Unavailable', 'This device does not support biometric authentication.');
         return;
       }
       if (!enrolled) {
-        Alert.alert('Fingerprint not set up', 'Set up a fingerprint or other biometric on your device first.');
+        setBiometricAvailable(false);
+        Alert.alert('Biometric not set up', 'Set up a fingerprint or other biometric on your device first.');
         return;
       }
+
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Sign in to CUPAD',
         cancelLabel: 'Cancel',
         disableDeviceFallback: false,
         fallbackLabel: 'Use device passcode',
       });
+
       if (!result.success) return;
+
       const success = await biometricLogin();
-      if (success) router.replace('/(tabs)');
-      else Alert.alert('Sign in again', 'Your saved session is no longer available. Sign in with your username and password once, then fingerprint login will be available again.');
+      if (success) {
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert(
+          'Sign in again',
+          'Your saved session is no longer available. Sign in with your username and password once, then biometric login will be available again.',
+        );
+      }
     } catch (e: any) {
-      Alert.alert('Fingerprint login failed', e?.message || 'Please sign in with your username and password.');
+      Alert.alert('Biometric login failed', e?.message || 'Please sign in with your username and password.');
     } finally {
       setBiometricLoading(false);
     }
   };
 
   const canSubmit = username.trim().length > 0 && password.length > 0 && !isLoading && !biometricLoading;
+  const busy = isLoading || biometricLoading;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.glowTop, { backgroundColor: colors.glowBlue }]} />
       <View style={[styles.glowBottom, { backgroundColor: colors.glowPurple }]} />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets>
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets
+        >
           <View style={styles.topBar}>
-            <View><Text style={[styles.topBrand, { color: colors.text }]}>CUPAD</Text><Text style={[styles.topBrandSub, { color: colors.textMuted }]}>STAFF PORTAL</Text></View>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Toggle dark mode" style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={toggle}>
-              <Ionicons name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'} size={20} color={colors.textSecondary} />
+            <View>
+              <Text style={[styles.topBrand, { color: colors.text }]}>CUPAD</Text>
+              <Text style={[styles.topBrandSub, { color: colors.textMuted }]}>STAFF PORTAL</Text>
+            </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              accessibilityHint="Changes the appearance of the login screen"
+              style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={toggle}
+              disabled={busy}
+            >
+              <Ionicons
+                name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'}
+                size={20}
+                color={colors.textSecondary}
+              />
             </TouchableOpacity>
           </View>
 
           <View style={styles.logoArea}>
-            <View style={[styles.logoCircle, { backgroundColor: colors.card, borderColor: colors.primary + '25' }]}>
-              <Image source={require('../../assets/cupad-logo.png')} style={styles.logoImage} resizeMode="contain" />
+            <View
+              style={[
+                styles.logoCircle,
+                { backgroundColor: colors.card, borderColor: colors.primary + '25' },
+              ]}
+            >
+              <Image
+                source={require('../../assets/cupad-logo.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+                accessibilityLabel="CUPAD logo"
+              />
+            </View>
+            <View style={[styles.portalPill, { backgroundColor: colors.infoBg }]}>
+              <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
+              <Text style={[styles.portalPillText, { color: colors.primary }]}>SECURE STAFF ACCESS</Text>
             </View>
             <Text style={[styles.welcome, { color: colors.text }]}>Welcome back</Text>
             <Text style={[styles.subheading, { color: colors.textSecondary }]}>Sign in securely to manage your CUPAD field activities.</Text>
@@ -95,51 +184,241 @@ export default function LoginScreen() {
 
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.cardHeader}>
-              <View><Text style={[styles.heading, { color: colors.text }]}>Staff Login</Text><Text style={[styles.cardHint, { color: colors.textSecondary }]}>Use your assigned account credentials</Text></View>
-              <View style={[styles.secureBadge, { backgroundColor: colors.infoBg }]}><Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} /></View>
+              <View style={styles.cardHeaderText}>
+                <Text style={[styles.heading, { color: colors.text }]}>Staff Login</Text>
+                <Text style={[styles.cardHint, { color: colors.textSecondary }]}>Use your assigned account credentials</Text>
+              </View>
+              <View style={[styles.secureBadge, { backgroundColor: colors.infoBg }]}>
+                <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+              </View>
             </View>
 
-            {error ? <View style={[styles.errorBox, { backgroundColor: colors.errorBg, borderColor: colors.error + '30' }]}>
-              <Ionicons name="alert-circle-outline" size={19} color={colors.error} /><View style={styles.errorContent}><Text style={[styles.errorTitle, { color: colors.error }]}>Login failed</Text><Text style={[styles.errorText, { color: colors.error }]}>{error}</Text></View>
-              <TouchableOpacity onPress={clearError} hitSlop={8}><Ionicons name="close" size={18} color={colors.error} /></TouchableOpacity>
-            </View> : null}
+            {error ? (
+              <View style={[styles.errorBox, { backgroundColor: colors.errorBg, borderColor: colors.error + '30' }]}>
+                <Ionicons name="alert-circle-outline" size={20} color={colors.error} />
+                <View style={styles.errorContent}>
+                  <Text style={[styles.errorTitle, { color: colors.error }]}>Unable to sign in</Text>
+                  <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+                </View>
+                <TouchableOpacity onPress={clearError} hitSlop={8} accessibilityLabel="Dismiss login error">
+                  <Ionicons name="close" size={18} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Username</Text>
-            <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: focused === 'username' ? colors.primary : colors.inputBorder }, focused === 'username' && { backgroundColor: colors.card, shadowColor: colors.primary, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }]}>
-              <View style={[styles.inputIconBox, { backgroundColor: colors.infoBg }]}><Ionicons name="person-outline" size={18} color={colors.primary} /></View>
-              <TextInput style={[styles.input, { color: colors.text }]} value={username} onChangeText={(v) => { setUsername(v); if (error) clearError(); }} placeholder="Enter your username" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} autoComplete="username" textContentType="username" returnKeyType="next" editable={!isLoading && !biometricLoading} onFocus={() => setFocused('username')} onBlur={() => setFocused(null)} onSubmitEditing={() => setFocused('password')} />
-              {username.length > 0 && <TouchableOpacity onPress={() => setUsername('')} hitSlop={8}><Ionicons name="close-circle" size={19} color={colors.textMuted} /></TouchableOpacity>}
+            <View
+              style={[
+                styles.inputWrap,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: focused === 'username' ? colors.primary : colors.inputBorder,
+                },
+                focused === 'username' && {
+                  backgroundColor: colors.card,
+                  shadowColor: colors.primary,
+                  shadowOpacity: 0.08,
+                  shadowRadius: 8,
+                  elevation: 2,
+                },
+              ]}
+            >
+              <View style={[styles.inputIconBox, { backgroundColor: colors.infoBg }]}>
+                <Ionicons name="person-outline" size={18} color={colors.primary} />
+              </View>
+              <TextInput
+                ref={usernameRef}
+                style={[styles.input, { color: colors.text }]}
+                value={username}
+                onChangeText={(value) => {
+                  setUsername(value);
+                  if (error) clearError();
+                }}
+                placeholder="Enter your username"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="username"
+                textContentType="username"
+                keyboardType="default"
+                returnKeyType="next"
+                editable={!busy}
+                onFocus={() => setFocused('username')}
+                onBlur={() => setFocused(null)}
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                accessibilityLabel="Username"
+              />
+              {username.length > 0 ? (
+                <TouchableOpacity
+                  onPress={() => setUsername('')}
+                  hitSlop={8}
+                  accessibilityLabel="Clear username"
+                  disabled={busy}
+                >
+                  <Ionicons name="close-circle" size={19} color={colors.textMuted} />
+                </TouchableOpacity>
+              ) : null}
             </View>
 
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Password</Text>
-            <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: focused === 'password' ? colors.primary : colors.inputBorder }, focused === 'password' && { backgroundColor: colors.card, shadowColor: colors.primary, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }]}>
-              <View style={[styles.inputIconBox, { backgroundColor: colors.infoBg }]}><Ionicons name="lock-closed-outline" size={18} color={colors.primary} /></View>
-              <TextInput style={[styles.input, { color: colors.text }]} value={password} onChangeText={(v) => { setPassword(v); if (error) clearError(); }} placeholder="Enter your password" placeholderTextColor={colors.textMuted} secureTextEntry={!showPassword} autoComplete="password" textContentType="password" returnKeyType="done" editable={!isLoading && !biometricLoading} onFocus={() => setFocused('password')} onBlur={() => setFocused(null)} onSubmitEditing={handleLogin} />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={8} style={styles.eye} accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}><Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textSecondary} /></TouchableOpacity>
+            <View
+              style={[
+                styles.inputWrap,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: focused === 'password' ? colors.primary : colors.inputBorder,
+                },
+                focused === 'password' && {
+                  backgroundColor: colors.card,
+                  shadowColor: colors.primary,
+                  shadowOpacity: 0.08,
+                  shadowRadius: 8,
+                  elevation: 2,
+                },
+              ]}
+            >
+              <View style={[styles.inputIconBox, { backgroundColor: colors.infoBg }]}>
+                <Ionicons name="lock-closed-outline" size={18} color={colors.primary} />
+              </View>
+              <TextInput
+                ref={passwordRef}
+                style={[styles.input, { color: colors.text }]}
+                value={password}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  if (error) clearError();
+                }}
+                placeholder="Enter your password"
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry={!showPassword}
+                autoComplete="password"
+                textContentType="password"
+                returnKeyType="done"
+                editable={!busy}
+                onFocus={() => setFocused('password')}
+                onBlur={() => setFocused(null)}
+                onSubmitEditing={handleLogin}
+                accessibilityLabel="Password"
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword((value) => !value)}
+                hitSlop={8}
+                style={styles.eye}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                disabled={busy}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.rowBetween}>
-              <TouchableOpacity style={styles.rememberRow} onPress={() => setRememberMe(!rememberMe)} activeOpacity={0.7}>
-                <View style={[styles.checkbox, { borderColor: rememberMe ? colors.primary : colors.border, backgroundColor: rememberMe ? colors.primary : 'transparent' }]}>{rememberMe && <Ionicons name="checkmark" size={12} color="#fff" />}</View>
+              <TouchableOpacity
+                style={styles.rememberRow}
+                onPress={() => setRememberMe((value) => !value)}
+                activeOpacity={0.7}
+                disabled={busy}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: rememberMe }}
+              >
+                <View
+                  style={[
+                    styles.checkbox,
+                    {
+                      borderColor: rememberMe ? colors.primary : colors.border,
+                      backgroundColor: rememberMe ? colors.primary : 'transparent',
+                    },
+                  ]}
+                >
+                  {rememberMe ? <Ionicons name="checkmark" size={12} color="#fff" /> : null}
+                </View>
                 <Text style={[styles.rememberText, { color: colors.textSecondary }]}>Remember me</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => Alert.alert('Password help', 'Please contact your CUPAD administrator to reset your password.')}><Text style={[styles.forgotText, { color: colors.primary }]}>Need help?</Text></TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => Alert.alert('Password help', 'Please contact your CUPAD administrator to reset your password.')}
+                disabled={busy}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.forgotText, { color: colors.primary }]}>Need help?</Text>
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.actionRow}>
-              <TouchableOpacity activeOpacity={0.9} onPress={handleLogin} disabled={!canSubmit} style={[styles.loginBtnWrap, { opacity: canSubmit ? 1 : 0.55 }]}>
-                <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.loginBtn}>
-                  {isLoading ? <><ActivityIndicator color="#fff" /><Text style={styles.loginBtnText}>Signing in…</Text></> : <><Text style={styles.loginBtnText}>Sign in</Text><Ionicons name="arrow-forward" size={19} color="#fff" /></>}
-                </LinearGradient>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={handleLogin}
+              disabled={!canSubmit}
+              style={[styles.loginBtnWrap, { opacity: canSubmit ? 1 : 0.55 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
+              accessibilityState={{ disabled: !canSubmit, busy: isLoading }}
+            >
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.loginBtn}
+              >
+                {isLoading ? (
+                  <>
+                    <ActivityIndicator color="#fff" />
+                    <Text style={styles.loginBtnText}>Signing in…</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.loginBtnText}>Sign in</Text>
+                    <Ionicons name="arrow-forward" size={19} color="#fff" />
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {biometricAvailable ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleFingerprint}
+                disabled={busy}
+                style={[
+                  styles.biometricWideBtn,
+                  {
+                    backgroundColor: colors.infoBg,
+                    borderColor: colors.primary + '35',
+                    opacity: busy ? 0.6 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Sign in with fingerprint or device biometric"
+              >
+                {biometricLoading ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Ionicons name="finger-print-outline" size={23} color={colors.primary} />
+                )}
+                <Text style={[styles.biometricText, { color: colors.primary }]}>Sign in with biometrics</Text>
+                <Ionicons name="chevron-forward" size={17} color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity activeOpacity={0.85} onPress={handleFingerprint} disabled={isLoading || biometricLoading} style={[styles.biometricBtn, { backgroundColor: colors.infoBg, borderColor: colors.primary + '35', opacity: isLoading || biometricLoading ? 0.6 : 1 }]} accessibilityRole="button" accessibilityLabel="Sign in with fingerprint or device biometric">
-                {biometricLoading ? <ActivityIndicator color={colors.primary} /> : <Ionicons name="finger-print-outline" size={25} color={colors.primary} />}
-              </TouchableOpacity>
+            ) : null}
+
+            <View style={[styles.securityPanel, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+              <View style={[styles.securityIcon, { backgroundColor: colors.infoBg }]}>
+                <Ionicons name="lock-closed" size={14} color={colors.success} />
+              </View>
+              <View style={styles.securityCopy}>
+                <Text style={[styles.securityTitle, { color: colors.text }]}>Secure connection</Text>
+                <Text style={[styles.securityText, { color: colors.textMuted }]}>Your credentials are protected during sign-in.</Text>
+              </View>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
             </View>
-            <Text style={[styles.biometricHint, { color: colors.textMuted }]}>Use fingerprint or device biometric for quick sign-in</Text>
-            <View style={styles.securityRow}><Ionicons name="lock-closed" size={13} color={colors.success} /><Text style={[styles.securityText, { color: colors.textMuted }]}>Your login is protected and securely transmitted</Text></View>
           </View>
-          <View style={styles.footerBlock}><Text style={[styles.motto, { color: colors.primary }]}>SUCCESS IS OURS</Text><Text style={[styles.footer, { color: colors.textMuted }]}>CUPAD Staff Portal • © 2026</Text></View>
+
+          <View style={styles.footerBlock}>
+            <Text style={[styles.motto, { color: colors.primary }]}>SUCCESS IS OURS</Text>
+            <Text style={[styles.footer, { color: colors.textMuted }]}>CUPAD Staff Portal • © 2026</Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -147,21 +426,175 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 }, container: { flex: 1 },
-  glowTop: { position: 'absolute', top: -90, left: width * 0.12, width: 250, height: 250, borderRadius: 125, opacity: 0.7 },
-  glowBottom: { position: 'absolute', bottom: -40, right: -50, width: 220, height: 220, borderRadius: 110, opacity: 0.55 },
-  scroll: { flexGrow: 1, width: '100%', maxWidth: 520, alignSelf: 'center', paddingHorizontal: SPACING.lg, paddingTop: Platform.OS === 'ios' ? 54 : 32, paddingBottom: 32 },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 },
-  topBrand: { fontSize: 16, fontWeight: '800', letterSpacing: 1 }, topBrandSub: { fontSize: 9, fontWeight: '700', letterSpacing: 1.4, marginTop: 2 },
-  iconBtn: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
-  logoArea: { alignItems: 'center', marginBottom: 28 }, logoCircle: { width: 104, height: 104, borderRadius: 52, justifyContent: 'center', alignItems: 'center', borderWidth: 1, marginBottom: 18, padding: 10, overflow: 'hidden' }, logoImage: { width: 84, height: 84 },
-  welcome: { fontSize: 27, fontWeight: '800', textAlign: 'center' }, subheading: { fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6, maxWidth: 350 },
-  card: { borderRadius: RADIUS.lg, padding: SPACING.lg, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 5 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }, heading: { fontSize: 21, fontWeight: '800' }, cardHint: { fontSize: 12, marginTop: 4 }, secureBadge: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  errorBox: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: RADIUS.sm, borderWidth: 1, marginBottom: 18, gap: 9 }, errorContent: { flex: 1 }, errorTitle: { fontSize: 12, fontWeight: '800', marginBottom: 2 }, errorText: { fontSize: 12, lineHeight: 17 },
-  fieldLabel: { fontSize: 12, fontWeight: '700', marginBottom: 7, marginLeft: 2 }, inputWrap: { minHeight: 56, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md, marginBottom: 16, paddingHorizontal: 10 }, inputIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, input: { flex: 1, paddingHorizontal: 10, paddingVertical: 14, fontSize: 15 }, eye: { padding: 7 },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2, marginBottom: 22 }, rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 }, checkbox: { width: 19, height: 19, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' }, rememberText: { fontSize: 12 }, forgotText: { fontSize: 12, fontWeight: '700' },
-  actionRow: { flexDirection: 'row', alignItems: 'stretch', gap: 10 }, loginBtnWrap: { flex: 1, borderRadius: RADIUS.md, overflow: 'hidden' }, loginBtn: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 }, loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  biometricBtn: { width: 58, minHeight: 56, borderRadius: RADIUS.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, biometricHint: { textAlign: 'center', fontSize: 10, marginTop: 9 }, securityRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 16 }, securityText: { fontSize: 10, textAlign: 'center' },
-  footerBlock: { alignItems: 'center', marginTop: 28 }, motto: { fontSize: 10, fontWeight: '800', letterSpacing: 1.5 }, footer: { fontSize: 10, marginTop: 5 },
+  flex: { flex: 1 },
+  container: { flex: 1 },
+  glowTop: {
+    position: 'absolute',
+    top: -90,
+    left: width * 0.12,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    opacity: 0.7,
+  },
+  glowBottom: {
+    position: 'absolute',
+    bottom: -40,
+    right: -50,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    opacity: 0.55,
+  },
+  scroll: {
+    flexGrow: 1,
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: Platform.OS === 'ios' ? 54 : 32,
+    paddingBottom: 34,
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  topBrand: { fontSize: 16, fontWeight: '800', letterSpacing: 1 },
+  topBrandSub: { fontSize: 9, fontWeight: '700', letterSpacing: 1.4, marginTop: 2 },
+  iconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  logoArea: { alignItems: 'center', marginBottom: 25 },
+  logoCircle: {
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 9,
+    overflow: 'hidden',
+  },
+  logoImage: { width: 98, height: 98 },
+  portalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 11,
+  },
+  liveDot: { width: 6, height: 6, borderRadius: 3 },
+  portalPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  welcome: { fontSize: 28, fontWeight: '800', textAlign: 'center' },
+  subheading: { fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6, maxWidth: 350 },
+  card: {
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.07,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 21,
+  },
+  cardHeaderText: { flex: 1, paddingRight: 12 },
+  heading: { fontSize: 21, fontWeight: '800' },
+  cardHint: { fontSize: 12, marginTop: 4 },
+  secureBadge: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    marginBottom: 18,
+    gap: 9,
+  },
+  errorContent: { flex: 1 },
+  errorTitle: { fontSize: 12, fontWeight: '800', marginBottom: 2 },
+  errorText: { fontSize: 12, lineHeight: 17 },
+  fieldLabel: { fontSize: 12, fontWeight: '700', marginBottom: 7, marginLeft: 2 },
+  inputWrap: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    marginBottom: 16,
+    paddingHorizontal: 10,
+  },
+  inputIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  input: { flex: 1, paddingHorizontal: 10, paddingVertical: 14, fontSize: 15 },
+  eye: { padding: 7 },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 1,
+    marginBottom: 20,
+  },
+  rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  checkbox: {
+    width: 19,
+    height: 19,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rememberText: { fontSize: 12 },
+  forgotText: { fontSize: 12, fontWeight: '700' },
+  loginBtnWrap: { width: '100%', borderRadius: RADIUS.md, overflow: 'hidden' },
+  loginBtn: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 18,
+  },
+  loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  biometricWideBtn: {
+    minHeight: 52,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  biometricText: { flex: 1, fontSize: 13, fontWeight: '700' },
+  securityPanel: {
+    marginTop: 15,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    padding: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  securityIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  securityCopy: { flex: 1 },
+  securityTitle: { fontSize: 11, fontWeight: '800', marginBottom: 2 },
+  securityText: { fontSize: 10, lineHeight: 15 },
+  footerBlock: { alignItems: 'center', marginTop: 25 },
+  motto: { fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  footer: { fontSize: 10, marginTop: 5 },
 });
