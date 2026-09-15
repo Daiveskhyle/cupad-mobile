@@ -1,0 +1,35 @@
+name: Import CUPAD Logo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-logo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout mobile repository
+        uses: actions/checkout@v4
+
+      - name: Download CUPAD logo
+        run: |
+          mkdir -p assets
+          curl -fL --retry 3 --retry-delay 2 "https://cupad.name.ng/uploads/CUPAD%20LOGO.png" -o "assets/cupad-logo.png"
+          file "assets/cupad-logo.png"
+          test "$(file -b --mime-type "assets/cupad-logo.png")" = "image/png"
+
+      - name: Commit logo to mobile repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/cupad-logo.png
+          if git diff --cached --quiet; then
+            echo "Logo is already up to date."
+          else
+            git commit -m "Add CUPAD logo asset"
+            git push
+          fi
