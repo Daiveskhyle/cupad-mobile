@@ -22,6 +22,9 @@ export default function CoLayout() {
       <Stack.Screen name="union-groups" options={{ title: 'Unions & Groups' }} />
       <Stack.Screen name="history" options={{ title: 'My History' }} />
       <Stack.Screen name="analytics" options={{ title: 'Analytics' }} />
+      <Stack.Screen name="client-summary" options={{ title: 'Client Financial Summary' }} />
+      <Stack.Screen name="close-account" options={{ title: 'Close Client Account' }} />
+      <Stack.Screen name="passkey" options={{ title: 'Passkey Setup' }} />
     </Stack>
   );
 }
