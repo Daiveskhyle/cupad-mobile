@@ -7,6 +7,7 @@ import { getRoleConfig } from '../../src/constants/roles';
 import { API_BASE_URL } from '../../src/constants/config';
 
 const CUPAD_LOGO = 'https://cupad.name.ng/uploads/CUPAD%20LOGO.png';
+const NAV_BLUE = '#0B2A5B';
 
 export default function TabsLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -53,16 +54,17 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginTop: 1 },
         tabBarItemStyle: { paddingVertical: 1 },
-        headerStyle: { backgroundColor: accent, elevation: 0, shadowOpacity: 0, height: 62 },
+        headerStyle: { backgroundColor: NAV_BLUE, elevation: 0, shadowOpacity: 0, height: 62 },
         headerTintColor: '#fff',
-        headerTitleAlign: 'center',
+        headerTitleAlign: 'left',
         headerTitleStyle: { fontWeight: '800', fontSize: 17 },
-        headerTitle: () => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              <Image source={{ uri: CUPAD_LOGO }} style={{ width: 30, height: 30 }} resizeMode="contain" />
+        headerTitle: () => null,
+        headerLeft: () => (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 14, gap: 9 }}>
+            <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              <Image source={{ uri: CUPAD_LOGO }} style={{ width: 34, height: 34 }} resizeMode="contain" />
             </View>
-            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900', letterSpacing: 0.4 }}>CUPAD</Text>
+            <Text style={{ color: '#fff', fontSize: 19, fontWeight: '900', letterSpacing: 0.5 }}>CUPAD</Text>
           </View>
         ),
         headerRight: () => (
