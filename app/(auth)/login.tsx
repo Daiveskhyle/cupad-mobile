@@ -12,7 +12,6 @@ import { useThemeStore } from '../../src/store/theme';
 import { SPACING, RADIUS } from '../../src/constants/config';
 
 const { width } = Dimensions.get('window');
-const CUPAD_LOGO = 'https://cupad.name.ng/uploads/CUPAD%20LOGO.png';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -88,7 +87,7 @@ export default function LoginScreen() {
 
           <View style={styles.logoArea}>
             <View style={[styles.logoCircle, { backgroundColor: colors.card, borderColor: colors.primary + '25' }]}>
-              <Image source={{ uri: CUPAD_LOGO }} style={styles.logoImage} resizeMode="contain" />
+              <Image source={require('../../assets/cupad-logo.png')} style={styles.logoImage} resizeMode="contain" />
             </View>
             <Text style={[styles.welcome, { color: colors.text }]}>Welcome back</Text>
             <Text style={[styles.subheading, { color: colors.textSecondary }]}>Sign in securely to manage your CUPAD field activities.</Text>
