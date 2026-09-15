@@ -1,28 +1,38 @@
-# CUPAD API v1.2 – deploy to PHP server
+# CUPAD Mobile API
 
-Replace the file on your server:
+This API is the compatibility layer between the Expo/React Native application and the existing CUPAD PHP/MySQL application.
 
-```
-/path/to/CUPAD/api/v1/index.php
-```
+## Required production deployment
 
-with `v1-index.php` from this folder.
+Deploy `v1-index.php` to the CUPAD server as the mobile API entry point, or route `/api/v1/*` to it through the existing server configuration.
 
-## New endpoints (JWT Bearer token)
+Before production:
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | /clients | List/search clients (scoped by role) |
-| GET | /clients/{id}/portfolio | Portfolio |
-| GET | /clients/{id}/savings | Savings |
-| GET | /clients/{id}/loans | Loans |
-| GET | /clients/{id}/transactions | Transactions |
-| GET | /dashboard/stats | Role-scoped dashboard numbers |
-| GET | /activities | Officer activity history |
-| POST | /savings/collect | Record savings deposit |
-| POST | /savings/withdraw | Record withdrawal |
-| POST | /loans/collect | Record loan repayment |
-| POST | /loans/disburse | Disburse loan |
-| POST | /clients/register | Register new client |
+1. Point the API at the same CUPAD database used by the existing PHP application.
+2. Configure the JWT signing secret outside Git.
+3. Enable HTTPS.
+4. Verify CORS allows only the intended CUPAD mobile/web origins.
+5. Verify every write endpoint against the existing CUPAD authorization and accounting rules.
+6. Never expose database credentials or API secrets in the Expo application.
 
-All previous endpoints remain. Clients endpoints now accept **JWT or API key**.
+## Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/auth/login` | Authenticate a CUPAD user and issue JWT |
+| GET | `/me` | Return the authenticated user |
+| GET | `/health` | API health check |
+| GET | `/clients` | Role-scoped client search/list |
+| GET | `/clients/{id}/portfolio` | Client portfolio summary |
+| GET | `/clients/{id}/savings` | Client savings records |
+| GET | `/clients/{id}/loans` | Client loans |
+| GET | `/clients/{id}/transactions` | Client transactions |
+| GET | `/dashboard/stats` | Role-scoped dashboard statistics |
+| GET | `/activities` | Officer activity history |
+| POST | `/clients/register` | Register a client |
+| POST | `/savings/collect` | Record savings collection |
+| POST | `/savings/withdraw` | Record savings withdrawal |
+| POST | `/loans/collect` | Record loan repayment |
+| POST | `/loans/disburse` | Disburse a loan |
+
+All financial write operations must remain subject to the server-side CUPAD authorization, validation and transaction rules. The mobile application is not trusted to enforce those rules by itself.
