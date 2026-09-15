@@ -7,21 +7,23 @@ import { useAuthStore } from '../../src/store/auth';
 import { useThemeStore } from '../../src/store/theme';
 import { SPACING, RADIUS } from '../../src/constants/config';
 import { getRoleConfig, ACTION_META } from '../../src/constants/roles';
-import { loadDashboardStats } from '../../src/services/data';
+import { loadDashboardStats, loadActivities } from '../../src/services/data';
 
 export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
   const roleCfg = getRoleConfig(user?.role);
   const colors = useThemeStore((s) => s.colors);
   const [stats, setStats] = useState<any>(null);
+  const [activities, setActivities] = useState<any[]>([]);
   const [statsNote, setStatsNote] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    loadDashboardStats().then((res) => {
+    Promise.all([loadDashboardStats(), loadActivities(30)]).then(([statsRes, activityRes]) => {
       if (!alive) return;
-      setStats(res.data);
-      setStatsNote(res.error || null);
+      setStats(statsRes.data);
+      setStatsNote(statsRes.error || null);
+      setActivities(activityRes.data || []);
     });
     return () => { alive = false; };
   }, []);
@@ -31,16 +33,33 @@ export default function DashboardScreen() {
   const isClient = roleCfg.key === 'client';
   const isManager = ['am', 'bm', 'zm', 'dzm', 'tm', 'admin'].includes(roleCfg.key);
 
+  const location = {
+    zone: stats?.zone_name || user?.zone_name || user?.zone_id,
+    area: stats?.area_name || user?.area_name || user?.area_id,
+    branch: stats?.branch_name || user?.branch_name || user?.branch_id,
+  };
+
   const handleAction = (key: string) => {
     const meta = ACTION_META[key];
-    if (meta?.route) {
-      router.push(meta.route as any);
-    } else if (key === 'clients' || key === 'portfolio') {
-      router.push('/(tabs)/search');
-    }
+    if (meta?.route) router.push(meta.route as any);
+    else if (key === 'clients' || key === 'portfolio') router.push('/(tabs)/search');
   };
 
   const money = (value: unknown) => `₦${Number(value ?? 0).toLocaleString()}`;
+  const activityIcon = (type: string) => {
+    if (type === 'Saving') return 'arrow-down-circle-outline';
+    if (type === 'Withdrawal') return 'arrow-up-circle-outline';
+    if (type === 'Payment') return 'cash-outline';
+    if (type === 'Disbursement') return 'card-outline';
+    return 'time-outline';
+  };
+  const activityColor = (type: string) => {
+    if (type === 'Saving') return '#16A34A';
+    if (type === 'Withdrawal') return '#DC2626';
+    if (type === 'Payment') return '#7C3AED';
+    if (type === 'Disbursement') return '#2563EB';
+    return colors.primary;
+  };
 
   const card = (title: string, value: string, icon: string, colorsList: [string, string]) => (
     <LinearGradient colors={colorsList} style={styles.summaryCard} key={title}>
@@ -59,13 +78,14 @@ export default function DashboardScreen() {
         <Text style={styles.roleDesc}>{roleCfg.description}</Text>
       </LinearGradient>
 
-      {(stats?.branch_name || stats?.area_name || stats?.zone_name || user?.zone_id || user?.area_id || user?.branch_id) ? (
+      {(location.zone || location.area || location.branch) ? (
         <View style={[styles.scopeCard, { backgroundColor: colors.card }]}>
-          <Ionicons name="location-outline" size={18} color={colors.primary} />
+          <Ionicons name="map-outline" size={20} color={colors.primary} />
           <View style={styles.scopeBody}>
-            {(stats?.zone_name || user?.zone_id) ? <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Zone: {stats?.zone_name || user?.zone_id}</Text> : null}
-            {(stats?.area_name || user?.area_id) ? <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Area: {stats?.area_name || user?.area_id}</Text> : null}
-            {(stats?.branch_name || user?.branch_id) ? <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Branch: {stats?.branch_name || user?.branch_id}</Text> : null}
+            <Text style={[styles.scopeHeading, { color: colors.text }]}>Assigned Location</Text>
+            {location.zone ? <Text style={[styles.scopeText, { color: colors.textSecondary }]}><Text style={styles.scopeLabel}>Zone:</Text> {location.zone}</Text> : null}
+            {location.area ? <Text style={[styles.scopeText, { color: colors.textSecondary }]}><Text style={styles.scopeLabel}>Area:</Text> {location.area}</Text> : null}
+            {location.branch ? <Text style={[styles.scopeText, { color: colors.textSecondary }]}><Text style={styles.scopeLabel}>Branch:</Text> {location.branch}</Text> : null}
           </View>
         </View>
       ) : null}
@@ -143,6 +163,36 @@ export default function DashboardScreen() {
         })}
       </View>
 
+      {!isClient && activities.length > 0 ? (
+        <>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleNoMargin, { color: colors.text }]}>Recent Activity</Text>
+            <Text style={[styles.historyHint, { color: colors.textSecondary }]}>Latest 30</Text>
+          </View>
+          {activities.map((item, index) => {
+            const color = activityColor(item.type);
+            const date = item.date ? new Date(item.date).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+            return (
+              <View key={`${item.transaction_id || item.type}-${item.date || index}`} style={[styles.activityCard, { backgroundColor: colors.card }]}>
+                <View style={[styles.activityIcon, { backgroundColor: `${color}18` }]}>
+                  <Ionicons name={activityIcon(item.type) as any} size={20} color={color} />
+                </View>
+                <View style={styles.activityBody}>
+                  <View style={styles.activityTop}>
+                    <Text style={[styles.activityClient, { color: colors.text }]} numberOfLines={1}>{item.client_name || 'Unknown client'}</Text>
+                    <Text style={[styles.activityAmount, { color }]}>{money(item.amount)}</Text>
+                  </View>
+                  <View style={styles.activityBottom}>
+                    <Text style={[styles.activityType, { color }]}>{item.type || 'Activity'}</Text>
+                    <Text style={[styles.activityDate, { color: colors.textSecondary }]}>{date}</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </>
+      ) : null}
+
       {!isClient ? (
         <TouchableOpacity style={styles.searchBanner} onPress={() => router.push('/(tabs)/search')} activeOpacity={0.85}>
           <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.searchBannerInner}>
@@ -170,10 +220,15 @@ const styles = StyleSheet.create({
   roleBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: RADIUS.full, marginTop: 10 },
   roleText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   roleDesc: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 8 },
-  scopeCard: { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, padding: 12, marginBottom: SPACING.md },
+  scopeCard: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: RADIUS.md, padding: 14, marginBottom: SPACING.md },
   scopeBody: { flex: 1, marginLeft: 10 },
-  scopeText: { fontSize: 13 },
+  scopeHeading: { fontSize: 14, fontWeight: '800', marginBottom: 5 },
+  scopeText: { fontSize: 13, lineHeight: 20 },
+  scopeLabel: { fontWeight: '700' },
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 4 },
+  sectionTitleNoMargin: { marginBottom: 0 },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 12 },
+  historyHint: { fontSize: 11, fontWeight: '600' },
   summaryGrid: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   summaryCard: { flex: 1, borderRadius: RADIUS.md, padding: 14, minHeight: 90 },
   cardIcon: { position: 'absolute', top: 10, right: 10, opacity: 0.9 },
@@ -187,7 +242,16 @@ const styles = StyleSheet.create({
   actionCard: { width: '30%', flexGrow: 1, maxWidth: '32%', borderRadius: RADIUS.md, paddingVertical: 14, paddingHorizontal: 8, alignItems: 'center', elevation: 1 },
   iconCircle: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
   actionLabel: { fontSize: 11, fontWeight: '600', textAlign: 'center' },
-  searchBanner: { marginBottom: SPACING.lg, borderRadius: RADIUS.md, overflow: 'hidden' },
+  activityCard: { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, padding: 12, marginBottom: 8 },
+  activityIcon: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  activityBody: { flex: 1 },
+  activityTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  activityClient: { flex: 1, fontSize: 13, fontWeight: '700' },
+  activityAmount: { fontSize: 13, fontWeight: '800' },
+  activityBottom: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
+  activityType: { fontSize: 11, fontWeight: '700' },
+  activityDate: { fontSize: 10 },
+  searchBanner: { marginBottom: SPACING.lg, marginTop: 8, borderRadius: RADIUS.md, overflow: 'hidden' },
   searchBannerInner: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   searchBannerText: { flex: 1, color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   infoCard: { flexDirection: 'row', backgroundColor: 'rgba(59,130,246,0.08)', borderRadius: RADIUS.md, padding: 14, gap: 10, marginBottom: 12 },
