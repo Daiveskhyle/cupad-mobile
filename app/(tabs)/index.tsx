@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,17 +16,43 @@ export default function DashboardScreen() {
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [statsNote, setStatsNote] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshDashboard = useCallback(async () => {
+    try {
+      const [statsRes, activityRes] = await Promise.all([
+        loadDashboardStats(),
+        loadActivities(30),
+      ]);
+      setStats(statsRes.data);
+      setStatsNote(statsRes.error || activityRes.error || null);
+      setActivities(activityRes.data || []);
+    } catch (error) {
+      setStatsNote(error instanceof Error ? error.message : 'Unable to refresh dashboard.');
+    }
+  }, []);
 
   useEffect(() => {
     let alive = true;
-    Promise.all([loadDashboardStats(), loadActivities(30)]).then(([statsRes, activityRes]) => {
-      if (!alive) return;
-      setStats(statsRes.data);
-      setStatsNote(statsRes.error || null);
-      setActivities(activityRes.data || []);
-    });
+    Promise.all([loadDashboardStats(), loadActivities(30)])
+      .then(([statsRes, activityRes]) => {
+        if (!alive) return;
+        setStats(statsRes.data);
+        setStatsNote(statsRes.error || activityRes.error || null);
+        setActivities(activityRes.data || []);
+      })
+      .catch((error) => {
+        if (!alive) return;
+        setStatsNote(error instanceof Error ? error.message : 'Unable to load dashboard.');
+      });
     return () => { alive = false; };
   }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshDashboard();
+    setRefreshing(false);
+  }, [refreshDashboard]);
 
   const displayName = user?.full_name || user?.name || user?.username || 'User';
   const isField = roleCfg.key === 'co';
@@ -71,7 +97,18 @@ export default function DashboardScreen() {
   );
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }
+    >
       <LinearGradient colors={[roleCfg.accent, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.welcomeCard}>
         <Text style={styles.greeting}>Welcome back,</Text>
         <Text style={styles.name}>{displayName}</Text>
