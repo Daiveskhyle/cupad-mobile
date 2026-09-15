@@ -4,21 +4,14 @@
     "slug": "cupad-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "scheme": "cupad",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#3B82F6"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ng.name.cupad.mobile"
     },
     "android": {
-      "icon": "./assets/icon.png",
       "adaptiveIcon": {
         "backgroundColor": "#3B82F6"
       },
@@ -26,8 +19,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/favicon.png"
+      "output": "static"
     },
     "plugins": [
       "expo-router",
