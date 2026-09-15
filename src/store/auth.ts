@@ -11,6 +11,7 @@ interface AuthState {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
+  updateUser: (payload: { full_name?: string; email?: string; current_password?: string; new_password?: string; profile_pic?: string }) => Promise<User>;
   clearError: () => void;
 }
 
@@ -25,40 +26,24 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const res = await api.login(username, password);
       if (res.success && res.user) {
-        set({
-          user: res.user,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        });
+        set({ user: res.user, isAuthenticated: true, isLoading: false, error: null });
         return true;
       }
-      set({
-        error: res.error || 'Invalid credentials',
-        isLoading: false,
-        isAuthenticated: false,
-      });
+      set({ error: res.error || 'Invalid credentials', isLoading: false, isAuthenticated: false });
       return false;
     } catch (e: any) {
-      const message =
-        e?.response?.data?.error || e?.message || 'Network error. Please try again.';
+      const message = e?.response?.data?.error || e?.message || 'Network error. Please try again.';
       set({ error: message, isLoading: false, isAuthenticated: false });
       return false;
     }
   },
 
   logout: async () => {
-    // Always clear local session first so UI never stays stuck logged-in
     set({ user: null, isAuthenticated: false, isLoading: false, error: null });
     try {
       await api.logout();
     } catch {
-      // ignore storage errors – session already cleared in memory
-      try {
-        await api.clearToken();
-      } catch {
-        /* ignore */
-      }
+      try { await api.clearToken(); } catch { /* ignore */ }
     }
   },
 
@@ -71,20 +56,21 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
       const user = await api.me();
-      if (user) {
-        set({ user, isAuthenticated: true, isLoading: false });
-      } else {
+      if (user) set({ user, isAuthenticated: true, isLoading: false });
+      else {
         await api.clearToken();
         set({ user: null, isAuthenticated: false, isLoading: false });
       }
     } catch {
-      try {
-        await api.clearToken();
-      } catch {
-        /* ignore */
-      }
+      try { await api.clearToken(); } catch { /* ignore */ }
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
+  },
+
+  updateUser: async (payload) => {
+    const updated = await api.updateProfile(payload);
+    set({ user: updated, error: null });
+    return updated;
   },
 
   clearError: () => set({ error: null }),
