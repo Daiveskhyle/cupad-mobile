@@ -9,6 +9,9 @@ export interface User {
   branch_id?: string;
   area_id?: string;
   zone_id?: string;
+  branch_name?: string | null;
+  area_name?: string | null;
+  zone_name?: string | null;
   profile_pic?: string | null;
   status?: string;
   last_login?: string;
