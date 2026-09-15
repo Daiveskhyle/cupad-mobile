@@ -7,7 +7,7 @@ import { getRoleConfig } from '../../src/constants/roles';
 import { API_BASE_URL } from '../../src/constants/config';
 
 const CUPAD_LOGO = 'https://cupad.name.ng/uploads/CUPAD%20LOGO.png';
-const NAV_BLUE = '#0B2A5B';
+const NAV_BLUE = '#1976D2';
 
 export default function TabsLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
