@@ -1,4 +1,4 @@
-import { Alert, Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import { Redirect, Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/auth';
@@ -31,30 +31,6 @@ export default function TabsLayout() {
     const origin = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
     return `${origin}/${clean}`;
   })();
-
-  const openMoreMenu = () => {
-    const buttons: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[] = [
-      { text: 'Home', onPress: () => router.replace('/(tabs)') },
-      { text: 'Clients', onPress: () => router.push('/(tabs)/search') },
-    ];
-
-    if (user?.role === 'co') {
-      buttons.push(
-        { text: 'Savings', onPress: () => router.push('/co/savings') },
-        { text: 'Loan Collection', onPress: () => router.push('/co/loan-collection') },
-        { text: 'Disbursement', onPress: () => router.push('/co/disbursement') },
-        { text: 'History', onPress: () => router.push('/co/history') },
-      );
-    }
-
-    buttons.push(
-      { text: 'Profile', onPress: () => router.push('/(tabs)/profile') },
-      { text: themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode', onPress: () => toggleTheme() },
-      { text: 'Cancel', style: 'cancel' },
-    );
-
-    Alert.alert('CUPAD Navigation', 'Choose a section', buttons);
-  };
 
   const tabIcon = (focused: boolean, active: string, inactive: string, color: string, size: number) => (
     <View style={focused ? { width: 42, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}14` } : undefined}>
@@ -107,14 +83,6 @@ export default function TabsLayout() {
               style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}
             >
               <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
-            </Pressable>
-            <Pressable
-              onPress={openMoreMenu}
-              accessibilityRole="button"
-              accessibilityLabel="Open navigation menu"
-              style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}
-            >
-              <Ionicons name="menu-outline" size={23} color={colors.primary} />
             </Pressable>
             <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Open profile">
               <View style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: colors.primary, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
