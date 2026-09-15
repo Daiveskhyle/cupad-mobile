@@ -34,10 +34,7 @@ function normalizeError(error: unknown): ApiError {
   const serverMessage = e?.response?.data?.error || e?.response?.data?.message;
 
   if (!e?.response && (e?.code === 'ERR_NETWORK' || e?.code === 'ECONNABORTED' || e?.message?.toLowerCase().includes('network'))) {
-    return new ApiError('Unable to connect to CUPAD. Check your internet connection.', {
-      code: e.code,
-      offline: true,
-    });
+    return new ApiError('Unable to connect to CUPAD. Check your internet connection.', { code: e.code, offline: true });
   }
   if (status === 401) return new ApiError('Your session has expired. Please sign in again.', { status });
   if (status === 403) return new ApiError(serverMessage || 'You do not have permission to perform this action.', { status });
@@ -84,6 +81,18 @@ class ApiClient {
   async me(): Promise<User | null> {
     const { data } = await this.client.get<{ success: boolean; data: User }>('/me');
     return data.success ? data.data : null;
+  }
+
+  async updateProfile(payload: {
+    full_name?: string;
+    email?: string;
+    current_password?: string;
+    new_password?: string;
+    profile_pic?: string;
+  }): Promise<User> {
+    const { data } = await this.client.put<{ success: boolean; data: User; error?: string }>('/profile', payload);
+    if (!data.success || !data.data) throw new ApiError(data.error || 'Profile update failed.');
+    return data.data;
   }
 
   async logout() { await this.clearToken(); }
