@@ -1,6 +1,6 @@
+import { Alert, Image, Pressable, Text, View } from 'react-native';
 import { Redirect, Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Image, Pressable, Text, View } from 'react-native';
 import { useAuthStore } from '../../src/store/auth';
 import { useThemeStore } from '../../src/store/theme';
 import { getRoleConfig } from '../../src/constants/roles';
@@ -14,6 +14,8 @@ export default function TabsLayout() {
   const isLoading = useAuthStore((s) => s.isLoading);
   const user = useAuthStore((s) => s.user);
   const colors = useThemeStore((s) => s.colors);
+  const themeMode = useThemeStore((s) => s.mode);
+  const toggleTheme = useThemeStore((s) => s.toggle);
   const roleCfg = getRoleConfig(user?.role);
   const accent = roleCfg.accent || colors.primary;
 
@@ -29,6 +31,30 @@ export default function TabsLayout() {
     const origin = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
     return `${origin}/${clean}`;
   })();
+
+  const openMoreMenu = () => {
+    const buttons: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[] = [
+      { text: 'Home', onPress: () => router.replace('/(tabs)') },
+      { text: 'Clients', onPress: () => router.push('/(tabs)/search') },
+    ];
+
+    if (user?.role === 'co') {
+      buttons.push(
+        { text: 'Savings', onPress: () => router.push('/co/savings') },
+        { text: 'Loan Collection', onPress: () => router.push('/co/loan-collection') },
+        { text: 'Disbursement', onPress: () => router.push('/co/disbursement') },
+        { text: 'History', onPress: () => router.push('/co/history') },
+      );
+    }
+
+    buttons.push(
+      { text: 'Profile', onPress: () => router.push('/(tabs)/profile') },
+      { text: themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode', onPress: () => toggleTheme() },
+      { text: 'Cancel', style: 'cancel' },
+    );
+
+    Alert.alert('CUPAD Navigation', 'Choose a section', buttons);
+  };
 
   const tabIcon = (focused: boolean, active: string, inactive: string, color: string, size: number) => (
     <View style={focused ? { width: 42, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}14` } : undefined}>
@@ -48,36 +74,54 @@ export default function TabsLayout() {
           paddingBottom: 10,
           paddingTop: 7,
           elevation: 12,
-          shadowOpacity: 0.12,
+          shadowOpacity: colors.isDark ? 0.35 : 0.12,
           shadowRadius: 14,
           shadowOffset: { width: 0, height: -4 },
         },
         tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginTop: 1 },
         tabBarItemStyle: { paddingVertical: 1 },
         headerStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: colors.card,
           elevation: 0,
           shadowOpacity: 0,
           height: 62,
           borderBottomWidth: 1,
-          borderBottomColor: '#E5E7EB',
+          borderBottomColor: colors.border,
         },
-        headerTintColor: NAV_BLUE,
+        headerTintColor: colors.primary,
         headerTitleAlign: 'left',
-        headerTitleStyle: { fontWeight: '700', fontSize: 17, color: NAV_BLUE },
+        headerTitleStyle: { fontWeight: '700', fontSize: 17, color: colors.primary },
         headerTitle: () => null,
         headerLeft: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 14, gap: 8 }}>
             <Image source={{ uri: CUPAD_LOGO }} style={{ width: 32, height: 32 }} resizeMode="contain" />
-            <Text style={{ color: NAV_BLUE, fontSize: 20, fontWeight: '800', letterSpacing: 0.2 }}>CUPAD</Text>
+            <Text style={{ color: colors.primary, fontSize: 20, fontWeight: '800', letterSpacing: 0.2 }}>CUPAD</Text>
           </View>
         ),
         headerRight: () => (
-          <Pressable onPress={() => router.push('/(tabs)/profile')} style={{ marginRight: 12 }} accessibilityRole="button" accessibilityLabel="Open profile">
-            <View style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: NAV_BLUE, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {profileUri ? <Image source={{ uri: profileUri }} style={{ width: '100%', height: '100%' }} /> : <Text style={{ color: NAV_BLUE, fontSize: 13, fontWeight: '800' }}>{initials}</Text>}
-            </View>
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 }}>
+            <Pressable
+              onPress={() => toggleTheme()}
+              accessibilityRole="button"
+              accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}
+            >
+              <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
+            </Pressable>
+            <Pressable
+              onPress={openMoreMenu}
+              accessibilityRole="button"
+              accessibilityLabel="Open navigation menu"
+              style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}
+            >
+              <Ionicons name="menu-outline" size={23} color={colors.primary} />
+            </Pressable>
+            <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Open profile">
+              <View style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: colors.primary, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                {profileUri ? <Image source={{ uri: profileUri }} style={{ width: '100%', height: '100%' }} /> : <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '800' }}>{initials}</Text>}
+              </View>
+            </Pressable>
+          </View>
         ),
       }}
     >
