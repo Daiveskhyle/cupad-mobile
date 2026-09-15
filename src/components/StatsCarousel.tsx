@@ -10,17 +10,13 @@ type StatItem = {
   colors: [string, string];
 };
 
-type Props = {
-  items: StatItem[];
-};
+type Props = { items: StatItem[] };
 
-const CARD_GAP = 12;
+const CARD_GAP = 10;
 
 export default function StatsCarousel({ items }: Props) {
   const { width: screenWidth } = useWindowDimensions();
-  // Dashboard content already has horizontal padding, so reserve another
-  // SPACING.md on both sides inside the carousel to keep every card fully visible.
-  const cardWidth = Math.max(0, screenWidth - SPACING.md * 4);
+  const cardWidth = Math.max(0, screenWidth - SPACING.md * 3);
   const snapInterval = cardWidth + CARD_GAP;
 
   return (
@@ -44,32 +40,24 @@ export default function StatsCarousel({ items }: Props) {
           >
             <View style={styles.topRow}>
               <View style={styles.iconCircle}>
-                <Ionicons name={item.icon as any} size={23} color="#fff" />
+                <Ionicons name={item.icon as any} size={19} color="#fff" />
               </View>
               <Text style={styles.index}>{index + 1}/{items.length}</Text>
             </View>
-
             <View style={styles.statBody}>
-              <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-              <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{item.value}</Text>
+              <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+              <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{item.value}</Text>
             </View>
-
             <View style={styles.bottomRow}>
-              <Text style={styles.swipeHint}>Swipe for more</Text>
-              <Ionicons name="arrow-forward" size={17} color="rgba(255,255,255,0.85)" />
+              <View style={styles.progressTrack}><View style={[styles.progress, { width: `${Math.max(12, ((index + 1) / items.length) * 100)}%` }]} /></View>
+              <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.8)" />
             </View>
           </LinearGradient>
         ))}
       </ScrollView>
-
       {items.length > 1 ? (
         <View style={styles.dots}>
-          {items.map((item, index) => (
-            <View
-              key={`${item.title}-dot-${index}`}
-              style={[styles.dot, index === 0 && styles.activeDot]}
-            />
-          ))}
+          {items.map((item, index) => <View key={`${item.title}-dot-${index}`} style={[styles.dot, index === 0 && styles.activeDot]} />)}
         </View>
       ) : null}
     </View>
@@ -77,38 +65,33 @@ export default function StatsCarousel({ items }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { marginBottom: SPACING.md },
-  content: {
-    paddingHorizontal: SPACING.md,
-  },
+  wrapper: { marginBottom: 10 },
+  content: { paddingHorizontal: SPACING.md },
   card: {
-    minHeight: 168,
+    minHeight: 124,
     borderRadius: RADIUS.lg,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
     justifyContent: 'space-between',
     overflow: 'hidden',
   },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statBody: {
-    flex: 1,
-    justifyContent: 'center',
-    minWidth: 0,
-  },
-  index: { color: 'rgba(255,255,255,0.78)', fontSize: 12, fontWeight: '800' },
-  title: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '700', marginTop: 14 },
-  value: { color: '#fff', fontSize: 30, fontWeight: '900', marginTop: 4 },
-  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
-  swipeHint: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
-  dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, marginTop: 9 },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#CBD5E1' },
-  activeDot: { width: 16, backgroundColor: '#64748B' },
+  statBody: { flex: 1, justifyContent: 'center', minWidth: 0 },
+  index: { color: 'rgba(255,255,255,0.72)', fontSize: 10, fontWeight: '800' },
+  title: { color: 'rgba(255,255,255,0.88)', fontSize: 11, fontWeight: '700', marginTop: 7 },
+  value: { color: '#fff', fontSize: 24, fontWeight: '900', marginTop: 2 },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  progressTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.18)', overflow: 'hidden' },
+  progress: { height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.8)' },
+  dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4, marginTop: 7 },
+  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1' },
+  activeDot: { width: 14, backgroundColor: '#64748B' },
 });
