@@ -37,7 +37,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiBaseUrl": "https://cupad.com.ng/api/v1",
+      "apiBaseUrl": "https://cupad.name.ng/api/v1",
       "router": {
         "origin": false
       }
