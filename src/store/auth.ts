@@ -7,8 +7,8 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
-
   login: (username: string, password: string) => Promise<boolean>;
+  biometricLogin: () => Promise<boolean>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
   updateUser: (payload: { full_name?: string; email?: string; current_password?: string; new_password?: string; profile_pic?: string }) => Promise<User>;
@@ -34,6 +34,28 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (e: any) {
       const message = e?.response?.data?.error || e?.message || 'Network error. Please try again.';
       set({ error: message, isLoading: false, isAuthenticated: false });
+      return false;
+    }
+  },
+
+  biometricLogin: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const token = await api.getToken();
+      if (!token) {
+        set({ isLoading: false, isAuthenticated: false });
+        return false;
+      }
+      const user = await api.me();
+      if (user) {
+        set({ user, isAuthenticated: true, isLoading: false, error: null });
+        return true;
+      }
+      await api.clearToken();
+      set({ user: null, isAuthenticated: false, isLoading: false });
+      return false;
+    } catch {
+      set({ isLoading: false, isAuthenticated: false });
       return false;
     }
   },
