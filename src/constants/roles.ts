@@ -21,8 +21,8 @@ export const ROLES: Record<string, RoleConfig> = {
   zm: { key: 'zm', label: 'Zone Manager', shortLabel: 'ZM', description: 'Manages an entire zone', scope: 'zone', accent: '#8B5CF6', actions: ['areas', 'branches', 'analytics', 'clients', 'officers'] },
   dzm: { key: 'dzm', label: 'Deputy Zone Manager', shortLabel: 'DZM', description: 'Assists zone management', scope: 'zone', accent: '#A78BFA', actions: ['areas', 'branches', 'analytics', 'clients', 'officers'] },
   am: { key: 'am', label: 'Area Manager', shortLabel: 'AM', description: 'Manages branches in an area', scope: 'area', accent: '#06B6D4', actions: ['branches', 'analytics', 'clients', 'activities', 'officers'] },
-  bm: { key: 'bm', label: 'Branch Manager', shortLabel: 'BM', description: 'Manages a single branch', scope: 'branch', accent: '#10B981', actions: ['clients', 'collect', 'savings', 'withdrawal', 'loans', 'disbursement', 'register', 'union_groups', 'history', 'analytics'] },
-  co: { key: 'co', label: 'Collection Officer', shortLabel: 'CO', description: 'Field collections & client visits', scope: 'branch', accent: '#F59E0B', actions: ['collect', 'savings', 'loans', 'disbursement', 'withdrawal', 'clients', 'register', 'union_groups', 'history', 'analytics'] },
+  bm: { key: 'bm', label: 'Branch Manager', shortLabel: 'BM', description: 'Manages a single branch', scope: 'branch', accent: '#10B981', actions: ['clients', 'collect', 'savings', 'withdrawal', 'loans', 'disbursement', 'register', 'union_groups', 'analytics', 'history', 'summary', 'close_account', 'passkey'] },
+  co: { key: 'co', label: 'Collection Officer', shortLabel: 'CO', description: 'Field collections & client visits', scope: 'branch', accent: '#F59E0B', actions: ['collect', 'savings', 'loans', 'disbursement', 'withdrawal', 'clients', 'register', 'union_groups', 'analytics', 'history', 'summary', 'close_account', 'passkey'] },
   tm: { key: 'tm', label: 'Territory Manager', shortLabel: 'TM', description: 'Territory-level oversight', scope: 'zone', accent: '#EC4899', actions: ['analytics', 'clients', 'branches', 'officers'] },
   client: { key: 'client', label: 'Client', shortLabel: 'Client', description: 'Member portal', scope: 'self', accent: '#6366F1', actions: ['portfolio', 'savings', 'loans', 'transactions'] },
 };
@@ -53,6 +53,9 @@ export const ACTION_META: Record<string, { label: string; icon: string; route?: 
   register: { label: 'Register', icon: 'person-add', color: '#6366F1', route: '/co/register' },
   union_groups: { label: 'Unions', icon: 'git-network', color: '#0EA5E9', route: '/co/union-groups' },
   history: { label: 'History', icon: 'time', color: '#64748B', route: '/co/history' },
+  summary: { label: 'Client Summary', icon: 'document-text', color: '#0EA5E9', route: '/co/client-summary' },
+  close_account: { label: 'Close Account', icon: 'person-remove', color: '#EF4444', route: '/co/close-account' },
+  passkey: { label: 'Passkey Setup', icon: 'finger-print', color: '#3B82F6', route: '/co/passkey' },
   portfolio: { label: 'My Portfolio', icon: 'pie-chart', color: '#6366F1' },
   transactions: { label: 'Transactions', icon: 'list', color: '#64748B' },
 };
