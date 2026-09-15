@@ -22,7 +22,7 @@ export const ROLES: Record<string, RoleConfig> = {
   dzm: { key: 'dzm', label: 'Deputy Zone Manager', shortLabel: 'DZM', description: 'Assists zone management', scope: 'zone', accent: '#A78BFA', actions: ['areas', 'branches', 'analytics', 'clients', 'officers'] },
   am: { key: 'am', label: 'Area Manager', shortLabel: 'AM', description: 'Manages branches in an area', scope: 'area', accent: '#06B6D4', actions: ['branches', 'analytics', 'clients', 'activities', 'officers'] },
   bm: { key: 'bm', label: 'Branch Manager', shortLabel: 'BM', description: 'Manages a single branch', scope: 'branch', accent: '#10B981', actions: ['clients', 'collect', 'savings', 'withdrawal', 'loans', 'disbursement', 'register', 'union_groups', 'history', 'analytics'] },
-  co: { key: 'co', label: 'Collection Officer', shortLabel: 'CO', description: 'Field collections & client visits', scope: 'branch', accent: '#F59E0B', actions: ['collect', 'savings', 'loans', 'disbursement', 'withdrawal', 'clients', 'register', 'union_groups', 'history'] },
+  co: { key: 'co', label: 'Collection Officer', shortLabel: 'CO', description: 'Field collections & client visits', scope: 'branch', accent: '#F59E0B', actions: ['collect', 'savings', 'loans', 'disbursement', 'withdrawal', 'clients', 'register', 'union_groups', 'history', 'analytics'] },
   tm: { key: 'tm', label: 'Territory Manager', shortLabel: 'TM', description: 'Territory-level oversight', scope: 'zone', accent: '#EC4899', actions: ['analytics', 'clients', 'branches', 'officers'] },
   client: { key: 'client', label: 'Client', shortLabel: 'Client', description: 'Member portal', scope: 'self', accent: '#6366F1', actions: ['portfolio', 'savings', 'loans', 'transactions'] },
 };
@@ -38,7 +38,7 @@ export const ACTION_META: Record<string, { label: string; icon: string; route?: 
   users: { label: 'Manage Users', icon: 'people', color: '#3B82F6' },
   branches: { label: 'Branches', icon: 'business', color: '#06B6D4' },
   areas: { label: 'Areas', icon: 'map', color: '#8B5CF6' },
-  analytics: { label: 'Analytics', icon: 'stats-chart', color: '#6366F1' },
+  analytics: { label: 'Analytics', icon: 'stats-chart', color: '#6366F1', route: '/co/analytics' },
   clients: { label: 'Clients', icon: 'person', color: '#10B981', route: '/(tabs)/search' },
   settings: { label: 'Settings', icon: 'settings', color: '#64748B' },
   backup: { label: 'Backup', icon: 'cloud-upload', color: '#F59E0B' },
