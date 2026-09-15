@@ -33,7 +33,6 @@ export default function TabsLayout() {
   })();
 
   const handleLogout = async () => {
-    // Clear the local session immediately. Do not wait for the server/network.
     await logout();
     router.replace('/(auth)/login');
   };
@@ -43,7 +42,6 @@ export default function TabsLayout() {
       if (window.confirm('Are you sure you want to sign out?')) void handleLogout();
       return;
     }
-    // Native confirmation is handled by the profile screen; header logout is immediate.
     void handleLogout();
   };
 
@@ -74,13 +72,13 @@ export default function TabsLayout() {
         ),
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 }}>
-            <Pressable onPress={confirmLogout} accessibilityRole="button" accessibilityLabel="Sign out" style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dangerBg || '#FEE2E2' }}>
+            <Pressable onPress={confirmLogout} accessibilityRole="button" accessibilityLabel="Sign out" style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dangerBg || '#FEE2E2', marginRight: 4 }}>
               <Ionicons name="log-out-outline" size={19} color={colors.danger || '#DC2626'} />
             </Pressable>
-            <Pressable onPress={() => toggleTheme()} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}>
+            <Pressable onPress={() => toggleTheme()} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg, marginRight: -2 }}>
               <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
             </Pressable>
-            <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Open profile">
+            <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Open profile" style={{ marginLeft: -2 }}>
               <View style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: colors.primary, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                 {profileUri ? <Image source={{ uri: profileUri }} style={{ width: '100%', height: '100%' }} /> : <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '800' }}>{initials}</Text>}
               </View>
