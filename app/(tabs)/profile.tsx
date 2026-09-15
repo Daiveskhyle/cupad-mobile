@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch, Platform, ActivityIndicator, TextInput, ScrollView, Image, KeyboardAvoidingView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../src/store/auth';
 import { useThemeStore } from '../../src/store/theme';
@@ -11,11 +12,9 @@ import { loadDashboardStats } from '../../src/services/data';
 
 type Location = { zone: string; area: string; branch: string };
 
-// Keep profile images consistent with the header avatar.
-// The API may return either a full URL or a relative uploads path.
 const resolveProfileUri = (value?: string | null) => {
   const raw = String(value || '').trim();
-  if (!raw || raw.toLowerCase().includes('default_avatar')) return null;
+  if (!raw || raw.toLowerCase().includes('default_avatar') || raw.startsWith('data:image/')) return raw.startsWith('data:image/') ? raw : null;
   if (/^https?:\/\//i.test(raw)) return raw;
   const clean = raw.replace(/^\.\//, '').replace(/^\//, '');
   const origin = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
@@ -44,6 +43,7 @@ export default function ProfileScreen() {
   const displayName = name.trim() || user?.username || 'User';
   const initials = useMemo(() => displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join(''), [displayName]);
   const profileUri = resolveProfileUri(profilePic);
+  const locationText = [location.zone, location.area, location.branch].filter(Boolean).join(' • ');
 
   useEffect(() => {
     setName(user?.full_name || user?.name || '');
@@ -61,6 +61,8 @@ export default function ProfileScreen() {
         area: stats.area_name || user?.area_name || '',
         branch: stats.branch_name || user?.branch_name || '',
       });
+    } catch {
+      setLocation({ zone: user?.zone_name || '', area: user?.area_name || '', branch: user?.branch_name || '' });
     } finally {
       setLocationLoading(false);
     }
@@ -79,30 +81,30 @@ export default function ProfileScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.75,
-      base64: true,
+      quality: 0.8,
+      base64: false,
     });
-    if (result.canceled || !result.assets?.[0]?.base64) return;
-    const asset = result.assets[0];
-    const mime = asset.mimeType || 'image/jpeg';
-    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(mime)) {
-      Alert.alert('Unsupported Image', 'Please select a JPG, PNG, or WebP image.');
-      return;
-    }
-    const dataUri = `data:${mime};base64,${asset.base64}`;
-    if (dataUri.length > 3_000_000) {
-      Alert.alert('Image Too Large', 'Please choose a smaller profile picture.');
-      return;
-    }
-    setProfilePic(dataUri);
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+
     setUploading(true);
+    const previousPic = user?.profile_pic;
     try {
+      const asset = result.assets[0];
+      const manipulated = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 512 } }],
+        { compress: 0.62, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+      );
+      if (!manipulated.base64) throw new Error('Could not prepare the selected photo.');
+      const dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
+      if (dataUri.length > 2_400_000) throw new Error('Image is still too large. Please choose another photo.');
+      setProfilePic(dataUri);
       const updated = await updateUser({ profile_pic: dataUri });
       setProfilePic(updated.profile_pic || undefined);
-      Alert.alert('Profile Picture', 'Profile picture updated successfully.');
+      Alert.alert('Photo Updated', 'Your profile picture has been updated.');
     } catch (e: any) {
-      setProfilePic(user?.profile_pic || undefined);
-      Alert.alert('Update Failed', e?.message || 'Could not update your profile picture.');
+      setProfilePic(previousPic || undefined);
+      Alert.alert('Photo Update Failed', e?.message || 'Could not update your profile picture.');
     } finally {
       setUploading(false);
     }
@@ -130,7 +132,7 @@ export default function ProfileScreen() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      Alert.alert('Profile Updated', 'Your profile details have been updated successfully.');
+      Alert.alert('Profile Updated', 'Your profile details have been saved successfully.');
     } catch (e: any) {
       Alert.alert('Update Failed', e?.message || 'Could not update your profile.');
     } finally {
@@ -157,63 +159,66 @@ export default function ProfileScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.background }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => void choosePhoto()} activeOpacity={0.85} disabled={uploading || saving}>
-            <View style={[styles.avatarFrame, { backgroundColor: colors.infoBg, borderColor: colors.primary }]}>
-              {profileUri ? (
-                <Image
-                  source={{ uri: profileUri }}
-                  style={styles.avatarImage}
-                  resizeMode="cover"
-                  onError={() => setProfilePic(undefined)}
-                  accessibilityLabel="Profile picture"
-                />
-              ) : (
-                <View style={[styles.avatar, { backgroundColor: roleCfg.accent || colors.primary }]}><Text style={styles.avatarText}>{initials || 'U'}</Text></View>
-              )}
+        <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.heroTop}>
+            <TouchableOpacity onPress={() => void choosePhoto()} activeOpacity={0.86} disabled={uploading || saving}>
+              <View style={[styles.avatarFrame, { backgroundColor: colors.infoBg, borderColor: colors.primary }]}>
+                {profileUri ? (
+                  <Image source={{ uri: profileUri }} style={styles.avatarImage} resizeMode="cover" onError={() => setProfilePic(undefined)} />
+                ) : (
+                  <View style={[styles.avatar, { backgroundColor: roleCfg.accent || colors.primary }]}><Text style={styles.avatarText}>{initials || 'U'}</Text></View>
+                )}
+              </View>
+              <View style={[styles.cameraBadge, { backgroundColor: colors.primary, borderColor: colors.card }]}>
+                {uploading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="camera" size={14} color="#fff" />}
+              </View>
+            </TouchableOpacity>
+            <View style={styles.heroInfo}>
+              <Text style={[styles.name, { color: colors.text }]} numberOfLines={2}>{displayName}</Text>
+              <View style={styles.rolePill}>
+                <View style={[styles.roleDot, { backgroundColor: roleCfg.accent || colors.primary }]} />
+                <Text style={[styles.role, { color: roleCfg.accent || colors.primary }]}>{roleCfg.label}</Text>
+              </View>
+              <TouchableOpacity onPress={() => void choosePhoto()} disabled={uploading || saving} style={styles.changePhoto}>
+                <Ionicons name="camera-outline" size={14} color={colors.primary} />
+                <Text style={[styles.changePhotoText, { color: colors.primary }]}>{uploading ? 'Uploading…' : 'Change photo'}</Text>
+              </TouchableOpacity>
             </View>
-            <View style={[styles.cameraBadge, { backgroundColor: colors.primary, borderColor: colors.background }]}>
-              {uploading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="camera" size={14} color="#fff" />}
+          </View>
+          <View style={[styles.assignmentBar, { backgroundColor: colors.infoBg }]}>
+            <Ionicons name="location" size={17} color={colors.primary} />
+            <View style={styles.assignmentText}>
+              <Text style={[styles.assignmentLabel, { color: colors.textSecondary }]}>ASSIGNED LOCATION</Text>
+              {locationLoading ? <Text style={[styles.assignmentValue, { color: colors.textSecondary }]}>Loading…</Text> : <Text style={[styles.assignmentValue, { color: colors.text }]} numberOfLines={1}>{locationText || 'Not assigned'}</Text>}
             </View>
-          </TouchableOpacity>
-          <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
-          <Text style={[styles.role, { color: roleCfg.accent || colors.primary }]}>{roleCfg.label}</Text>
-          <Text style={[styles.photoHint, { color: colors.textSecondary }]}>Tap photo to change</Text>
-        </View>
-
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <SectionTitle icon="create-outline" title="Personal Information" subtitle="Update your name and email" colors={colors} />
-          <Field label="Full Name" value={name} onChangeText={setName} placeholder="Enter your full name" icon="person-outline" colors={colors} />
-          <Field label="Email Address" value={email} onChangeText={setEmail} placeholder="Enter your email" icon="mail-outline" keyboardType="email-address" autoCapitalize="none" colors={colors} />
-          <InfoRow icon="person-circle-outline" label="Username" value={user?.username} colors={colors} />
-          <InfoRow icon="call-outline" label="Phone" value={user?.phone || 'Not provided'} colors={colors} last />
-        </View>
-
-        <View style={[styles.card, { backgroundColor: colors.card, marginTop: 12 }]}>
-          <SectionTitle icon="lock-closed-outline" title="Password" subtitle="Leave blank if you do not want to change it" colors={colors} />
-          <PasswordField label="Current Password" value={currentPassword} onChangeText={setCurrentPassword} visible={showCurrentPassword} setVisible={setShowCurrentPassword} colors={colors} />
-          <PasswordField label="New Password" value={newPassword} onChangeText={setNewPassword} visible={showNewPassword} setVisible={setShowNewPassword} colors={colors} />
-          <PasswordField label="Confirm New Password" value={confirmPassword} onChangeText={setConfirmPassword} visible={showConfirmPassword} setVisible={setShowConfirmPassword} colors={colors} last />
-          <View style={[styles.passwordHint, { backgroundColor: colors.infoBg }]}>
-            <Ionicons name="shield-checkmark-outline" size={17} color={colors.primary} />
-            <Text style={[styles.passwordHintText, { color: colors.textSecondary }]}>Your current password is required before a new password can be saved.</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </View>
         </View>
 
-        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: saving || uploading ? 0.65 : 1 }]} onPress={() => void saveProfile()} disabled={saving || uploading} activeOpacity={0.85}>
-          {saving ? <ActivityIndicator color="#fff" /> : <><Ionicons name="checkmark-circle-outline" size={21} color="#fff" /><Text style={styles.saveText}>Save Profile Changes</Text></>}
+        <SectionCard colors={colors} icon="person-outline" title="Personal information" subtitle="Keep your account details up to date">
+          <Field label="Full name" value={name} onChangeText={setName} placeholder="Enter your full name" icon="person-outline" colors={colors} />
+          <Field label="Email address" value={email} onChangeText={setEmail} placeholder="Enter your email" icon="mail-outline" keyboardType="email-address" autoCapitalize="none" colors={colors} />
+          <InfoRow icon="at-outline" label="Username" value={user?.username} colors={colors} />
+          <InfoRow icon="call-outline" label="Phone" value={user?.phone || 'Not provided'} colors={colors} last />
+        </SectionCard>
+
+        <SectionCard colors={colors} icon="shield-checkmark-outline" title="Security" subtitle="Change your password when needed" style={{ marginTop: 12 }}>
+          <PasswordField label="Current password" value={currentPassword} onChangeText={setCurrentPassword} visible={showCurrentPassword} setVisible={setShowCurrentPassword} colors={colors} />
+          <PasswordField label="New password" value={newPassword} onChangeText={setNewPassword} visible={showNewPassword} setVisible={setShowNewPassword} colors={colors} />
+          <PasswordField label="Confirm new password" value={confirmPassword} onChangeText={setConfirmPassword} visible={showConfirmPassword} setVisible={setShowConfirmPassword} colors={colors} last />
+          <View style={[styles.securityHint, { backgroundColor: colors.infoBg }]}>
+            <Ionicons name="information-circle-outline" size={17} color={colors.primary} />
+            <Text style={[styles.securityHintText, { color: colors.textSecondary }]}>Leave all password fields blank if you only want to update your profile details.</Text>
+          </View>
+        </SectionCard>
+
+        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: saving || uploading ? 0.65 : 1 }]} onPress={() => void saveProfile()} disabled={saving || uploading} activeOpacity={0.86}>
+          {saving ? <ActivityIndicator color="#fff" /> : <><Ionicons name="checkmark-circle-outline" size={21} color="#fff" /><Text style={styles.saveText}>Save changes</Text></>}
         </TouchableOpacity>
 
-        <View style={[styles.card, { backgroundColor: colors.card, marginTop: 12 }]}>
-          <View style={styles.locationHeader}>
-            <View style={[styles.locationIcon, { backgroundColor: colors.primary + '16' }]}><Ionicons name="location-outline" size={21} color={colors.primary} /></View>
-            <View style={styles.locationHeaderText}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Assigned Location</Text>
-              <Text style={[styles.sectionHint, { color: colors.textSecondary }]}>Your current field assignment</Text>
-            </View>
-          </View>
+        <SectionCard colors={colors} icon="map-outline" title="Assigned location" subtitle="Your current field assignment" style={{ marginTop: 12 }}>
           {locationLoading ? (
             <View style={styles.loadingRow}><ActivityIndicator size="small" color={colors.primary} /><Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading location…</Text></View>
           ) : <>
@@ -221,77 +226,110 @@ export default function ProfileScreen() {
             <InfoRow icon="map-outline" label="Area" value={location.area || 'Not assigned'} colors={colors} />
             <InfoRow icon="business-outline" label="Branch" value={location.branch || 'Not assigned'} colors={colors} last />
           </>}
-        </View>
+        </SectionCard>
 
-        <View style={[styles.card, { backgroundColor: colors.card, marginTop: 12 }]}>
-          <View style={styles.themeRow}>
-            <View style={styles.themeLeft}><Ionicons name={mode === 'dark' ? 'moon' : 'sunny'} size={22} color={colors.primary} /><View style={{ marginLeft: 14 }}><Text style={[styles.themeLabel, { color: colors.text }]}>Dark Mode</Text><Text style={[styles.themeHint, { color: colors.textSecondary }]}>{mode === 'dark' ? 'On' : 'Off'}</Text></View></View>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 12 }]}>
+          <View style={styles.settingRow}>
+            <View style={[styles.settingIcon, { backgroundColor: colors.infoBg }]}><Ionicons name={mode === 'dark' ? 'moon' : 'sunny'} size={20} color={colors.primary} /></View>
+            <View style={styles.settingText}><Text style={[styles.settingTitle, { color: colors.text }]}>Dark mode</Text><Text style={[styles.settingHint, { color: colors.textSecondary }]}>{mode === 'dark' ? 'Enabled' : 'Disabled'}</Text></View>
             <Switch value={mode === 'dark'} onValueChange={() => toggle()} trackColor={{ false: colors.border, true: colors.primary }} thumbColor="#fff" />
           </View>
         </View>
 
-        <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.logoutBg, opacity: busy ? 0.7 : 1 }]} onPress={handleLogout} disabled={busy} activeOpacity={0.8}>
-          {busy ? <ActivityIndicator color={colors.error} /> : <><Ionicons name="log-out-outline" size={22} color={colors.error} /><Text style={[styles.logoutText, { color: colors.error }]}>Sign Out</Text></>}
+        <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.logoutBg, borderColor: colors.logoutBg, opacity: busy ? 0.7 : 1 }]} onPress={handleLogout} disabled={busy} activeOpacity={0.82}>
+          {busy ? <ActivityIndicator color={colors.error} /> : <><Ionicons name="log-out-outline" size={21} color={colors.error} /><Text style={[styles.logoutText, { color: colors.error }]}>Sign out</Text></>}
         </TouchableOpacity>
+        <Text style={[styles.footer, { color: colors.textMuted }]}>CUPAD Mobile • Account & Security</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-function SectionTitle({ icon, title, subtitle, colors }: { icon: keyof typeof Ionicons.glyphMap; title: string; subtitle: string; colors: any }) {
-  return <View style={styles.sectionTitleRow}><View style={[styles.sectionIcon, { backgroundColor: colors.primary + '16' }]}><Ionicons name={icon} size={19} color={colors.primary} /></View><View style={styles.sectionTitleText}><Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.sectionHint, { color: colors.textSecondary }]}>{subtitle}</Text></View></View>;
+function SectionCard({ icon, title, subtitle, colors, children, style }: any) {
+  return <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, style]}>
+    <View style={styles.sectionTitleRow}>
+      <View style={[styles.sectionIcon, { backgroundColor: colors.infoBg }]}><Ionicons name={icon} size={19} color={colors.primary} /></View>
+      <View style={styles.sectionTitleText}><Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.sectionHint, { color: colors.textSecondary }]}>{subtitle}</Text></View>
+    </View>
+    {children}
+  </View>;
 }
 
 function Field({ label, value, onChangeText, placeholder, icon, colors, keyboardType, autoCapitalize }: any) {
-  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text><View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}><Ionicons name={icon} size={19} color={colors.primary} /><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.textMuted} keyboardType={keyboardType} autoCapitalize={autoCapitalize} style={[styles.input, { color: colors.text }]} /></View></View>;
+  return <View style={styles.fieldWrap}>
+    <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
+    <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+      <Ionicons name={icon} size={19} color={colors.primary} />
+      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.textMuted} keyboardType={keyboardType} autoCapitalize={autoCapitalize} style={[styles.input, { color: colors.text }]} returnKeyType="done" />
+    </View>
+  </View>;
 }
 
 function PasswordField({ label, value, onChangeText, visible, setVisible, colors, last }: any) {
-  return <View style={[styles.fieldWrap, last && { marginBottom: 0 }]}><Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text><View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}><Ionicons name="lock-closed-outline" size={19} color={colors.primary} /><TextInput value={value} onChangeText={onChangeText} placeholder="••••••••" placeholderTextColor={colors.textMuted} secureTextEntry={!visible} style={[styles.input, { color: colors.text }]} autoCapitalize="none" /><TouchableOpacity onPress={() => setVisible(!visible)}><Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textSecondary} /></TouchableOpacity></View></View>;
+  return <View style={[styles.fieldWrap, last && { marginBottom: 0 }]}>
+    <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
+    <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+      <Ionicons name="lock-closed-outline" size={19} color={colors.primary} />
+      <TextInput value={value} onChangeText={onChangeText} placeholder="Enter password" placeholderTextColor={colors.textMuted} secureTextEntry={!visible} style={[styles.input, { color: colors.text }]} autoCapitalize="none" returnKeyType="done" />
+      <TouchableOpacity onPress={() => setVisible(!visible)} hitSlop={10}><Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textSecondary} /></TouchableOpacity>
+    </View>
+  </View>;
 }
 
 function InfoRow({ icon, label, value, colors, last }: { icon: keyof typeof Ionicons.glyphMap; label: string; value?: string | null; colors: any; last?: boolean }) {
-  return <View style={[styles.row, !last && { borderBottomWidth: 1, borderBottomColor: colors.border }]}><Ionicons name={icon} size={20} color={colors.primary} /><View style={styles.rowText}><Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{label}</Text><Text style={[styles.rowValue, { color: colors.text }]} numberOfLines={2}>{value || '—'}</Text></View></View>;
+  return <View style={[styles.row, !last && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+    <Ionicons name={icon} size={19} color={colors.primary} />
+    <View style={styles.rowText}><Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{label}</Text><Text style={[styles.rowValue, { color: colors.text }]} numberOfLines={2}>{value || '—'}</Text></View>
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  container: { padding: SPACING.md, paddingBottom: 40 },
-  header: { alignItems: 'center', marginVertical: 20 },
-  avatarFrame: { width: 98, height: 98, borderRadius: 49, justifyContent: 'center', alignItems: 'center', borderWidth: 2, padding: 2, overflow: 'hidden' },
-  avatar: { width: '100%', height: '100%', borderRadius: 47, justifyContent: 'center', alignItems: 'center' },
-  avatarImage: { width: '100%', height: '100%', borderRadius: 47 },
-  avatarText: { fontSize: 34, fontWeight: '700', color: '#fff' },
-  cameraBadge: { position: 'absolute', right: 0, bottom: 0, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 3 },
-  name: { fontSize: 22, fontWeight: '700', marginTop: 12 },
-  role: { fontSize: 13, fontWeight: '600', marginTop: 4 },
-  photoHint: { fontSize: 12, marginTop: 5 },
-  card: { borderRadius: 16, padding: 8 },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingBottom: 6 },
+  screen: { flex: 1 },
+  container: { padding: SPACING.md, paddingBottom: 44 },
+  hero: { borderRadius: 20, borderWidth: 1, padding: 14, marginBottom: 12 },
+  heroTop: { flexDirection: 'row', alignItems: 'center' },
+  heroInfo: { flex: 1, marginLeft: 14 },
+  avatarFrame: { width: 88, height: 88, borderRadius: 44, justifyContent: 'center', alignItems: 'center', borderWidth: 2, padding: 2, overflow: 'hidden' },
+  avatar: { width: '100%', height: '100%', borderRadius: 42, justifyContent: 'center', alignItems: 'center' },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 42 },
+  avatarText: { fontSize: 30, fontWeight: '700', color: '#fff' },
+  cameraBadge: { position: 'absolute', right: -1, bottom: -1, width: 29, height: 29, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 3 },
+  name: { fontSize: 21, fontWeight: '700', lineHeight: 27 },
+  rolePill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 5 },
+  roleDot: { width: 7, height: 7, borderRadius: 4, marginRight: 6 },
+  role: { fontSize: 12, fontWeight: '700' },
+  changePhoto: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 9, paddingVertical: 3 },
+  changePhotoText: { fontSize: 12, fontWeight: '600', marginLeft: 5 },
+  assignmentBar: { minHeight: 50, borderRadius: 13, marginTop: 14, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' },
+  assignmentText: { flex: 1, marginHorizontal: 10 },
+  assignmentLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 0.7 },
+  assignmentValue: { fontSize: 13, fontWeight: '600', marginTop: 2 },
+  card: { borderRadius: 16, borderWidth: 1, padding: 8 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', padding: 10, paddingBottom: 7 },
   sectionIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  sectionTitleText: { marginLeft: 12, flex: 1 },
-  sectionTitle: { fontSize: 16, fontWeight: '700' },
-  sectionHint: { fontSize: 12, marginTop: 2 },
-  fieldWrap: { margin: 8, marginBottom: 4 },
-  fieldLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
-  inputWrap: { minHeight: 50, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13 },
-  input: { flex: 1, marginLeft: 10, fontSize: 15, minHeight: 48 },
-  row: { flexDirection: 'row', alignItems: 'center', padding: 14 },
-  rowText: { marginLeft: 14, flex: 1 },
-  rowLabel: { fontSize: 12 },
-  rowValue: { fontSize: 15, fontWeight: '500', marginTop: 2 },
-  passwordHint: { margin: 8, marginTop: 12, borderRadius: 10, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  passwordHintText: { flex: 1, fontSize: 11, lineHeight: 16 },
+  sectionTitleText: { marginLeft: 11, flex: 1 },
+  sectionTitle: { fontSize: 15, fontWeight: '700' },
+  sectionHint: { fontSize: 11, marginTop: 2 },
+  fieldWrap: { marginHorizontal: 8, marginBottom: 8 },
+  fieldLabel: { fontSize: 11, fontWeight: '600', marginBottom: 5 },
+  inputWrap: { minHeight: 48, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
+  input: { flex: 1, marginLeft: 9, fontSize: 14, minHeight: 46 },
+  row: { flexDirection: 'row', alignItems: 'center', padding: 12 },
+  rowText: { marginLeft: 12, flex: 1 },
+  rowLabel: { fontSize: 11 },
+  rowValue: { fontSize: 14, fontWeight: '500', marginTop: 2 },
+  securityHint: { margin: 8, marginTop: 11, borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center' },
+  securityHintText: { flex: 1, fontSize: 11, lineHeight: 16, marginLeft: 8 },
   saveBtn: { minHeight: 52, borderRadius: 13, marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   saveText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  locationHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, paddingBottom: 6 },
-  locationIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  locationHeaderText: { marginLeft: 12, flex: 1 },
-  loadingRow: { flexDirection: 'row', alignItems: 'center', padding: 18 },
-  loadingText: { marginLeft: 10, fontSize: 13 },
-  themeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
-  themeLeft: { flexDirection: 'row', alignItems: 'center' },
-  themeLabel: { fontSize: 15, fontWeight: '600' },
-  themeHint: { fontSize: 12, marginTop: 2 },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, padding: 16, gap: 8, marginTop: 24 },
-  logoutText: { fontSize: 16, fontWeight: '700' },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+  loadingText: { marginLeft: 10, fontSize: 12 },
+  settingRow: { flexDirection: 'row', alignItems: 'center', padding: 10 },
+  settingIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  settingText: { flex: 1, marginLeft: 12 },
+  settingTitle: { fontSize: 14, fontWeight: '600' },
+  settingHint: { fontSize: 11, marginTop: 2 },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 13, borderWidth: 1, padding: 15, gap: 8, marginTop: 18 },
+  logoutText: { fontSize: 15, fontWeight: '700' },
+  footer: { textAlign: 'center', fontSize: 10, marginTop: 14 },
 });
