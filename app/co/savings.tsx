@@ -16,7 +16,7 @@ const parseDate = (value: string) => { const [y, m, d] = value.split('-').map(Nu
 const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 type Settings = { min_savings_amount: number; max_savings_amount: number; allow_weekend_collection: number; savings_date_readonly: number };
-type Row = Client & { savings_balance: number; amount: string; notes: string };
+type Row = Client & { savings_balance: number; loan_outstanding: number; amount: string; notes: string };
 const defaultSettings: Settings = { min_savings_amount: 100, max_savings_amount: 1000000, allow_weekend_collection: 0, savings_date_readonly: 0 };
 
 export default function SavingsCollectionScreen() {
@@ -64,9 +64,15 @@ export default function SavingsCollectionScreen() {
       const loaded = await Promise.all(selected.map(async (client) => {
         try {
           const portfolio = await api.getPortfolio(client.id);
-          return { ...client, savings_balance: Number(portfolio?.savings?.balance || 0), amount: '', notes: '' };
+          return {
+            ...client,
+            savings_balance: Number(portfolio?.savings?.balance || 0),
+            loan_outstanding: Number(portfolio?.loans?.outstanding || 0),
+            amount: '',
+            notes: ''
+          };
         } catch {
-          return { ...client, savings_balance: 0, amount: '', notes: '' };
+          return { ...client, savings_balance: 0, loan_outstanding: 0, amount: '', notes: '' };
         }
       }));
       setRows(loaded.sort((a, b) => a.name.localeCompare(b.name)));
@@ -153,7 +159,19 @@ export default function SavingsCollectionScreen() {
 
         {loading || loadingRows ? <View style={styles.loading}><ActivityIndicator color={colors.primary} size="large" /><Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading clients...</Text></View> : filtered.length === 0 ? <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}><Ionicons name="people-outline" size={38} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No clients in this union</Text><Text style={[styles.emptyText, { color: colors.textSecondary }]}>Select another union or check the client assignment.</Text></View> : filtered.map((row) => (
           <View key={row.id} style={[styles.clientCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.clientTop}><View style={[styles.avatar, { backgroundColor: colors.infoBg }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{row.name.split(/\s+/).slice(0, 2).map((x) => x[0]).join('').toUpperCase()}</Text></View><View style={{ flex: 1 }}><Text style={[styles.clientName, { color: colors.text }]}>{row.name}</Text><Text style={[styles.clientMeta, { color: colors.textSecondary }]}>{row.phone || row.id} • Balance {money(row.savings_balance)}</Text></View></View>
+            <View style={styles.clientTop}><View style={[styles.avatar, { backgroundColor: colors.infoBg }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{row.name.split(/\s+/).slice(0, 2).map((x) => x[0]).join('').toUpperCase()}</Text></View><View style={{ flex: 1 }}><Text style={[styles.clientName, { color: colors.text }]}>{row.name}</Text><Text style={[styles.clientMeta, { color: colors.textSecondary }]}>{row.phone || row.id}</Text></View></View>
+
+            <View style={styles.clientStats}>
+              <View style={[styles.clientStat, { backgroundColor: colors.infoBg }]}>
+                <View style={styles.statIcon}><Ionicons name="wallet-outline" size={15} color={colors.primary} /></View>
+                <View style={{ flex: 1 }}><Text style={[styles.statLabel, { color: colors.textMuted }]}>SAVINGS BALANCE</Text><Text style={[styles.statValue, { color: colors.text }]}>{money(row.savings_balance)}</Text></View>
+              </View>
+              <View style={[styles.clientStat, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                <View style={[styles.statIcon, { backgroundColor: colors.card }]}><Ionicons name="cash-outline" size={15} color="#B91C1C" /></View>
+                <View style={{ flex: 1 }}><Text style={[styles.statLabel, { color: colors.textMuted }]}>LOAN OUTSTANDING</Text><Text style={[styles.statValue, { color: colors.text }]}>{money(row.loan_outstanding)}</Text></View>
+              </View>
+            </View>
+
             <View style={styles.amountRow}><View style={[styles.amountWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}><Text style={[styles.currency, { color: colors.primary }]}>₦</Text><TextInput value={row.amount} onChangeText={(v) => setRow(row.id, 'amount', v)} placeholder="0" placeholderTextColor={colors.textMuted} keyboardType="decimal-pad" style={[styles.amountInput, { color: colors.text }]} /></View><Pressable onPress={() => saveRow(row)} disabled={savingId === row.id} style={[styles.collectBtn, { backgroundColor: colors.primary, opacity: savingId === row.id ? 0.65 : 1 }]}>{savingId === row.id ? <ActivityIndicator color="#fff" /> : <><Ionicons name="checkmark" size={18} color="#fff" /><Text style={styles.collectText}>Collect</Text></>}</Pressable></View>
             <TextInput value={row.notes} onChangeText={(v) => setRow(row.id, 'notes', v)} placeholder="Notes (optional)" placeholderTextColor={colors.textMuted} style={[styles.notes, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} />
           </View>
@@ -185,6 +203,8 @@ const styles = StyleSheet.create({
   tabs: { gap: 8, paddingVertical: 3, paddingBottom: 10 }, tab: { minHeight: 42, borderWidth: 1, borderRadius: 13, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 220 }, tabText: { fontSize: 12, fontWeight: '800', maxWidth: 145 }, count: { minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 }, countText: { fontSize: 10, fontWeight: '900' },
   search: { borderWidth: 1, borderRadius: 13, minHeight: 46, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 10 }, searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },
   loading: { paddingVertical: 50, alignItems: 'center', gap: 10 }, loadingText: { fontSize: 13 }, empty: { borderWidth: 1, borderRadius: 16, padding: 30, alignItems: 'center' }, emptyTitle: { fontSize: 16, fontWeight: '800', marginTop: 10 }, emptyText: { fontSize: 12, textAlign: 'center', marginTop: 5 },
-  clientCard: { borderWidth: 1, borderRadius: 16, padding: 13, marginBottom: 10 }, clientTop: { flexDirection: 'row', alignItems: 'center', gap: 10 }, avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' }, avatarText: { fontSize: 13, fontWeight: '900' }, clientName: { fontSize: 14, fontWeight: '900' }, clientMeta: { fontSize: 10, marginTop: 3 }, amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }, amountWrap: { flex: 1, borderWidth: 1, borderRadius: 12, minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }, currency: { fontSize: 17, fontWeight: '900' }, amountInput: { flex: 1, fontSize: 16, fontWeight: '800', marginLeft: 4 }, collectBtn: { minHeight: 48, borderRadius: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }, collectText: { color: '#fff', fontSize: 12, fontWeight: '900' }, notes: { borderWidth: 1, borderRadius: 12, minHeight: 42, paddingHorizontal: 12, marginTop: 8, fontSize: 12 },
+  clientCard: { borderWidth: 1, borderRadius: 16, padding: 13, marginBottom: 10 }, clientTop: { flexDirection: 'row', alignItems: 'center', gap: 10 }, avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' }, avatarText: { fontSize: 13, fontWeight: '900' }, clientName: { fontSize: 14, fontWeight: '900' }, clientMeta: { fontSize: 10, marginTop: 3 },
+  clientStats: { flexDirection: 'row', gap: 8, marginTop: 12 }, clientStat: { flex: 1, minHeight: 62, borderRadius: 12, padding: 9, flexDirection: 'row', alignItems: 'center', gap: 8 }, statIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,.6)' }, statLabel: { fontSize: 8, fontWeight: '900', letterSpacing: .2 }, statValue: { fontSize: 14, fontWeight: '900', marginTop: 2 },
+  amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }, amountWrap: { flex: 1, borderWidth: 1, borderRadius: 12, minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }, currency: { fontSize: 17, fontWeight: '900' }, amountInput: { flex: 1, fontSize: 16, fontWeight: '800', marginLeft: 4 }, collectBtn: { minHeight: 48, borderRadius: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }, collectText: { color: '#fff', fontSize: 12, fontWeight: '900' }, notes: { borderWidth: 1, borderRadius: 12, minHeight: 42, paddingHorizontal: 12, marginTop: 8, fontSize: 12 },
   footerTotal: { borderWidth: 1, borderRadius: 15, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }, footerLabel: { fontSize: 9, fontWeight: '900' }, footerCount: { fontSize: 13, fontWeight: '800', marginTop: 2 }, footerAmount: { fontSize: 19, fontWeight: '900' },
 });
