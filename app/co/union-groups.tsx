@@ -2,14 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../src/store/theme';
-import { useAuthStore } from '../../src/store/auth';
+import { api } from '../../src/api/client';
 import { API_BASE_URL, RADIUS, SPACING } from '../../src/constants/config';
 
 const PRIMARY = '#3B82F6';
 
 export default function UnionGroupsScreen() {
   const colors = useThemeStore((s) => s.colors);
-  const token = useAuthStore((s) => s.token);
   const [groups, setGroups] = useState<any[]>([]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -20,6 +19,7 @@ export default function UnionGroupsScreen() {
 
   const loadGroups = useCallback(async () => {
     try {
+      const token = await api.getToken();
       const response = await fetch(`${API_BASE_URL}/co/union-groups`, { headers: { Authorization: `Bearer ${token || ''}`, Accept: 'application/json' } });
       const data = await response.json();
       if (!response.ok || data?.success === false) throw new Error(data?.error || 'Unable to load unions');
@@ -27,7 +27,7 @@ export default function UnionGroupsScreen() {
     } catch (error: any) {
       Alert.alert('Unable to load groups', error?.message || 'Please check your connection and try again.');
     } finally { setLoading(false); setRefreshing(false); }
-  }, [token]);
+  }, []);
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
 
@@ -36,6 +36,7 @@ export default function UnionGroupsScreen() {
     if (!cleanName) return Alert.alert('Group name required', 'Enter a name for the union/group.');
     setSaving(true);
     try {
+      const token = await api.getToken();
       const response = await fetch(`${API_BASE_URL}/co/union-groups`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token || ''}`, 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -106,5 +107,5 @@ const styles = StyleSheet.create({
   label: { fontSize: 12, fontWeight: '700', marginBottom: 6 }, input: { borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 13, paddingVertical: 12, fontSize: 14, marginBottom: 14 }, description: { minHeight: 72, textAlignVertical: 'top' }, primaryButton: { height: 48, borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, primaryText: { color: '#fff', fontSize: 14, fontWeight: '800' },
   listHeader: { marginBottom: 9 }, listTitle: { fontSize: 17, fontWeight: '800' }, listSubtitle: { fontSize: 11, marginTop: 2 }, searchBox: { height: 46, borderRadius: RADIUS.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, marginBottom: 11 }, searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },
   groupCard: { minHeight: 78, borderRadius: RADIUS.md, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center', marginBottom: 9 }, groupIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: '#EFF6FF' }, groupBody: { flex: 1 }, groupName: { fontSize: 14, fontWeight: '800' }, groupDescription: { fontSize: 11, marginTop: 3, lineHeight: 16 }, groupMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }, groupMetaText: { fontSize: 10 },
-  loading: { alignItems: 'center', paddingVertical: 40 }, loadingText: { fontSize: 12, marginTop: 10 }, empty: { borderRadius: RADIUS.lg, borderWidth: 1, padding: 30, alignItems: 'center' }, emptyIcon: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }, emptyTitle: { fontSize: 15, fontWeight: '800', marginTop: 12 }, emptyText: { fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 5 },
+  loading: { alignItems: 'center', paddingVertical: 40 }, loadingText: { fontSize: 12, marginTop: 10 }, empty: { borderRadius: RADIUS.lg, borderWidth: 1, padding: 30, alignItems: 'center' }, emptyIcon: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF6FF' }, emptyTitle: { fontSize: 15, fontWeight: '800', marginTop: 12 }, emptyText: { fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 5 },
 });
