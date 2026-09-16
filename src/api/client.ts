@@ -27,7 +27,7 @@ class ApiClient {
   async getActivities(limit=30):Promise<any[]>{const{data}=await this.client.get<ApiResponse<any[]>>('/activities',{params:{limit}});return data.data||[]}
   async getCombinedUnionData(union:string,date:string):Promise<any[]>{const{data}=await this.client.get<any>('/combined/union-data',{params:{union,date}});const rows=Array.isArray(data?.data)?data.data:[];if(data?.settings)Object.defineProperty(rows,'__settings',{value:data.settings,enumerable:false,configurable:true});return rows}
   async saveCombinedCollection(payload:{client_id:string;date:string;installment:number;savings_amount:number;withdrawal_type:string;withdrawal_amount:number;notes?:string}){const{data}=await this.client.post('/combined/save',payload);return data}
-  async collectSavings(payload:{client_id:string;amount:number;notes?:string}){const{data}=await this.client.post('/savings/collect',payload);return data}
+  async collectSavings(payload:{client_id:string;amount:number;date?:string;notes?:string}){const{data}=await this.client.post('/savings/collect',payload);return data}
   async withdrawSavings(payload:{client_id:string;amount:number;notes?:string;reason?:string}){const{data}=await this.client.post('/savings/withdraw',payload);return data}
   async collectLoan(payload:{client_id:string;amount:number;notes?:string;loan_id?:string|number}){const{data}=await this.client.post('/loans/collect',payload);return data}
   async disburseLoan(payload:{client_id:string;principal:number;interest_rate:number;num_installments:number;loan_term_type:string}){const{data}=await this.client.post('/loans/disburse',payload);return data}
