@@ -71,7 +71,7 @@ export default function CoLayout() {
                 backgroundColor: '#FEE2E2',
               }}
             >
-              <Ionicons name="log-out-outline" size={22} color="#DC2626" />
+              <Ionicons name="log-out" size={22} color="#991B1B" />
             </Pressable>
             <Pressable onPress={toggleTheme} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}>
               <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
