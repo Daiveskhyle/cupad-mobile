@@ -1,9 +1,8 @@
-import { Image, Platform, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/auth';
 import { useThemeStore } from '../../src/store/theme';
-import { getRoleConfig } from '../../src/constants/roles';
 import { API_BASE_URL } from '../../src/constants/config';
 
 const CUPAD_LOGO = 'https://cupad.name.ng/uploads/CUPAD%20LOGO.png';
@@ -13,8 +12,6 @@ export default function CoLayout() {
   const themeMode = useThemeStore((s) => s.mode);
   const toggleTheme = useThemeStore((s) => s.toggle);
   const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
-  const roleCfg = getRoleConfig(user?.role);
 
   const displayName = user?.full_name || user?.name || user?.username || 'User';
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'U';
@@ -26,19 +23,6 @@ export default function CoLayout() {
     const origin = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
     return `${origin}/${clean}`;
   })();
-
-  const signOut = async () => {
-    await logout();
-    router.replace('/(auth)/login');
-  };
-
-  const confirmLogout = () => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if (window.confirm('Are you sure you want to sign out?')) void signOut();
-      return;
-    }
-    void signOut();
-  };
 
   return (
     <Stack
@@ -58,25 +42,11 @@ export default function CoLayout() {
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 2 }}>
             <Pressable
-              onPress={confirmLogout}
+              onPress={toggleTheme}
               accessibilityRole="button"
-              accessibilityLabel="Sign out"
-              hitSlop={8}
-              style={({ pressed }) => ({
-                width: 38,
-                height: 38,
-                borderRadius: 12,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: pressed ? colors.infoBg : colors.card,
-                borderWidth: 1,
-                borderColor: colors.border,
-                opacity: pressed ? 0.75 : 1,
-              })}
+              accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}
             >
-              <Ionicons name="log-out-outline" size={21} color={colors.primary} />
-            </Pressable>
-            <Pressable onPress={toggleTheme} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}>
               <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
             </Pressable>
             <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Open profile">
