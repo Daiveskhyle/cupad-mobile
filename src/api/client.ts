@@ -25,7 +25,7 @@ class ApiClient {
   async getTransactions(clientId:string):Promise<Transaction[]>{const{data}=await this.client.get<ApiResponse<Transaction[]>>(`/clients/${encodeURIComponent(clientId)}/transactions`);return data.data||[]}
   async getDashboardStats():Promise<any|null>{const{data}=await this.client.get<{success:boolean;data:any}>('/dashboard/stats');return data.success?data.data:null}
   async getActivities(limit=30):Promise<any[]>{const{data}=await this.client.get<ApiResponse<any[]>>('/activities',{params:{limit}});return data.data||[]}
-  async getCombinedUnionData(union:string,date:string):Promise<any[]>{const{data}=await this.client.get<ApiResponse<any[]>>('/combined/union-data',{params:{union,date}});return data.data||[]}
+  async getCombinedUnionData(union:string,date:string):Promise<any[]>{const{data}=await this.client.get<any>('/combined/union-data',{params:{union,date}});const rows=Array.isArray(data?.data)?data.data:[];if(data?.settings)Object.defineProperty(rows,'__settings',{value:data.settings,enumerable:false,configurable:true});return rows}
   async saveCombinedCollection(payload:{client_id:string;date:string;installment:number;savings_amount:number;withdrawal_type:string;withdrawal_amount:number;notes?:string}){const{data}=await this.client.post('/combined/save',payload);return data}
   async collectSavings(payload:{client_id:string;amount:number;notes?:string}){const{data}=await this.client.post('/savings/collect',payload);return data}
   async withdrawSavings(payload:{client_id:string;amount:number;notes?:string;reason?:string}){const{data}=await this.client.post('/savings/withdraw',payload);return data}
