@@ -43,7 +43,7 @@ export default function CoLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.card, height: 62 },
+        headerStyle: { backgroundColor: colors.card },
         headerTintColor: colors.primary,
         headerShadowVisible: false,
         headerTitleAlign: 'left',
@@ -57,8 +57,21 @@ export default function CoLayout() {
         ),
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 2 }}>
-            <Pressable onPress={confirmLogout} accessibilityRole="button" accessibilityLabel="Sign out" style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dangerBg || '#FEE2E2' }}>
-              <Ionicons name="log-out-outline" size={19} color={colors.danger || '#DC2626'} />
+            <Pressable
+              onPress={confirmLogout}
+              accessibilityRole="button"
+              accessibilityLabel="Sign out"
+              hitSlop={8}
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#FEE2E2',
+              }}
+            >
+              <Ionicons name="log-out-outline" size={22} color="#DC2626" />
             </Pressable>
             <Pressable onPress={toggleTheme} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}>
               <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
