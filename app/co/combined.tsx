@@ -1,7 +1,6 @@
 import { useCallback,useEffect,useMemo,useState } from 'react';
 import { ActivityIndicator,Alert,KeyboardAvoidingView,Platform,Pressable,RefreshControl,ScrollView,StyleSheet,Text,TextInput,View } from 'react-native';
 import DateTimePicker,{DateTimePickerEvent} from '@react-native-community/datetimepicker';
-import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
@@ -32,11 +31,17 @@ const blockedTypes=(s:Settings)=>{try{const v=Array.isArray(s.blocked_withdrawal
 
 export default function CombinedCollectionScreen(){
  const user=useAuthStore(s=>s.user);const roleCfg=getRoleConfig(user?.role);const colors=useThemeStore(s=>s.colors);
- const [date,setDate]=useState(today());const [showDatePicker,setShowDatePicker]=useState(false);const [clients,setClients]=useState<Client[]>([]);const [unions,setUnions]=useState<string[]>([]);const [activeUnion,setActiveUnion]=useState('');const [rows,setRows]=useState<Row[]>([]);const [edits,setEdits]=useState<Record<string,Edit>>({});const [settings,setSettings]=useState<Settings>(defaultSettings);const [query,setQuery]=useState('');const [loading,setLoading]=useState(true);const [loadingRows,setLoadingRows]=useState(false);const [saving,setSaving]=useState(false);const [refreshing,setRefreshing]=useState(false);const [dashboardStats,setDashboardStats]=useState<any>(null);
+ const [date,setDate]=useState(today());const [showDatePicker,setShowDatePicker]=useState(false);const [clients,setClients]=useState<Client[]>([]);const [unions,setUnions]=useState<string[]>([]);const [activeUnion,setActiveUnion]=useState('');const [rows,setRows]=useState<Row[]>([]);const [edits,setEdits]=useState<Record<string,Edit>>({});const [settings,setSettings]=useState<Settings>(defaultSettings);
+ const dateLocked =
+   settings.date_readonly === 1 ||
+   String(settings.date_readonly).trim().toLowerCase() === '1' ||
+   String(settings.date_readonly).trim().toLowerCase() === 'true';
+
  const displayName=user?.full_name||user?.name||user?.username||'User';const firstName=displayName.trim().split(/\s+/)[0]||displayName;const hour=new Date().getHours();const greeting=hour<12?'GOOD MORNING':hour<17?'GOOD AFTERNOON':'GOOD EVENING';
+
  const location={zone:typeof dashboardStats?.zone_name==='string'&&dashboardStats.zone_name.trim()?dashboardStats.zone_name:(typeof user?.zone_name==='string'&&user.zone_name.trim()?user.zone_name:null),area:typeof dashboardStats?.area_name==='string'&&dashboardStats.area_name.trim()?dashboardStats.area_name:(typeof user?.area_name==='string'&&user.area_name.trim()?user.area_name:null),branch:typeof dashboardStats?.branch_name==='string'&&dashboardStats.branch_name.trim()?dashboardStats.branch_name:(typeof user?.branch_name==='string'&&user.branch_name.trim()?user.branch_name:null)};
  const loadUnions=useCallback(async()=>{setLoading(true);try{const [r,s]=await Promise.all([api.getClients({limit:100,offset:0}),loadDashboardStats()]);const a=(r.data||[]).filter((c:any)=>String(c.status||'').toLowerCase()==='active');setClients(a);setDashboardStats(s.data||null);const n=Array.from(new Set(a.map((c:any)=>String(c.union||'').trim()||'Unassigned'))).sort((x,y)=>x.localeCompare(y));setUnions(n);setActiveUnion(p=>p&&n.includes(p)?p:(n[0]||''));}catch(e:any){Alert.alert('Unable to load clients',e?.message||'Please try again.')}finally{setLoading(false)}},[]);
- const loadUnion=useCallback(async()=>{if(!activeUnion){setRows([]);return}setLoadingRows(true);try{const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));setRows(d);setEdits(p=>{const n={...p};d.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0)||((Number(r.loan?.total_payable||0))/(Number(r.loan?.num_installments)||23));const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):'',notes:''}});return n})}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.')}finally{setLoadingRows(false)}},[activeUnion,date]);
+ const loadUnion=useCallback(async()=>{if(!activeUnion){setRows([]);return}setLoadingRows(true);try{const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));setRows(d);setEdits(p=>{const n={...p};d.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0)||((Number(r.loan?.total_payable||0))/(Number(r.loan?.num_installments)||23));const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):'',notes:''}}});return n})}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.')}finally{setLoadingRows(false)}},[activeUnion,date]);
  useFocusEffect(useCallback(()=>{loadUnions()},[loadUnions]));useEffect(()=>{loadUnion()},[loadUnion]);
  const refresh=async()=>{setRefreshing(true);await loadUnions();setRefreshing(false)};
  const filtered=useMemo(()=>rows.filter(r=>r.name.toLowerCase().includes(query.trim().toLowerCase())||r.id.toLowerCase().includes(query.trim().toLowerCase())),[rows,query]);
@@ -51,9 +56,24 @@ export default function CombinedCollectionScreen(){
  const countForAmount=(r:Row,amount:number)=>{const i=installment(r);if(i<=0)return 0;return Math.round(amount/i)};
  const selectInstallments=(r:Row,count:number)=>{const min=allowedMin(),max=allowedMax(r);if(count<min||count>max){Alert.alert('Installment limit',`This client allows ${min} to ${max} installment(s) per payment.`);return}setEdits(p=>({...p,[r.id]:{...(p[r.id]||blank()),installment:String(amountForCount(r,count)),installmentCount:String(count)}}))};
  const selectAdjustment=(r:Row,type:'withdrawal'|'return')=>{const blocked=blockedTypes(settings);if(blocked.includes(type)||blocked.includes(type==='withdrawal'?'deduct':'return')){Alert.alert('Adjustment disabled','This adjustment type is disabled by the administrator.');return}const pct=type==='withdrawal'?Number(settings.buffer_withdrawal||10):Number(settings.buffer_return||10);const amount=Math.round(principal(r)*(pct/100)*100)/100;setEdits(p=>({...p,[r.id]:{...(p[r.id]||blank()),withdrawalType:type,withdrawal:amount>0?String(amount):''}}))};
- const handleDateChange=(event:DateTimePickerEvent,selectedDate?:Date)=>{if(Platform.OS!=='ios')setShowDatePicker(false);if(event.type==='set'&&selectedDate)setDate(formatDate(selectedDate))};
- const openDatePicker=()=>{if(Number(settings.date_readonly)===1){Alert.alert('Date controlled','The administrator has locked collection date changes.');return}const current=parseDate(date);if(Platform.OS==='android'){DateTimePickerAndroid.open({value:current,mode:'date',display:'calendar',onChange:(event,selectedDate)=>{if(event.type==='set'&&selectedDate)setDate(formatDate(selectedDate));}});return}setShowDatePicker(true)};
- const autofill=()=>setEdits(p=>{const n={...p};rows.forEach(r=>{if(installment(r)>0&&!r.existing.loan_amt){const count=Math.min(allowedMax(r),Math.max(allowedMin(),1));n[r.id]={...(n[r.id]||blank()),installment:String(amountForCount(r,count)),installmentCount:String(count)}}});return n});
+ const handleDateChange=(event:DateTimePickerEvent,selectedDate?:Date)=>{
+  if(dateLocked)return;
+  if(event.type==='set'&&selectedDate)setDate(formatDate(selectedDate));
+  if(Platform.OS!=='ios'||event.type==='dismissed')setShowDatePicker(false);
+};
+
+const openDatePicker=()=>{
+  if(dateLocked){
+    Alert.alert(
+      'Date locked',
+      'The administrator has locked the collection date. Only today’s date can be used.'
+    );
+    return;
+  }
+  setShowDatePicker(true);
+};
+
+const autofill=()=>setEdits(p=>{const n={...p};rows.forEach(r=>{if(installment(r)>0&&!r.existing.loan_amt){const count=Math.min(allowedMax(r),Math.max(allowedMin(),1));n[r.id]={...(n[r.id]||blank()),installment:String(amountForCount(r,count)),installmentCount:String(count)}}});return n});
  const saveRow=async(r:Row)=>{const e=edits[r.id]||blank();let loanCount=Number(e.installmentCount)||0;const enteredAmount=num(e.installment);const sav=num(e.savings);const w=num(e.withdrawal);if(!loanCount&&enteredAmount>0)loanCount=countForAmount(r,enteredAmount);if(enteredAmount>0&&loanCount<=0)return Alert.alert('Invalid repayment','Enter an amount matching the client installment amount.');const min=allowedMin(),max=allowedMax(r);if(loanCount>0&&(loanCount<min||loanCount>max))return Alert.alert('Installment limit',`Allowed installments: ${min} to ${max}.`);if(loanCount>0&&!settings.allow_partial_payments&&enteredAmount!==amountForCount(r,loanCount))return Alert.alert('Invalid repayment','Repayment must match a complete installment amount.');if(loanCount>0&&['withdrawal','return'].includes(e.withdrawalType))return Alert.alert('Invalid combination','Repayment and Deduct/Return cannot be processed together.');if(sav>0&&(sav<Number(settings.min_savings_amount)||sav>Number(settings.max_savings_amount)))return Alert.alert('Savings limit',`Savings must be between ${money(settings.min_savings_amount)} and ${money(settings.max_savings_amount)}.`);if(!loanCount&&!sav&&!w)return Alert.alert('No collection entered','Enter a loan repayment, savings collection or adjustment.');const day=parseDate(date).getDay();if(day===0||day===6){if((loanCount>0||sav>0)&&!Number(settings.allow_weekend_collection))return Alert.alert('Weekend collection disabled','The administrator has disabled weekend collections.');if(w>0&&!Number(settings.allow_weekend_withdrawals))return Alert.alert('Weekend adjustment disabled','The administrator has disabled weekend withdrawals.')}setSaving(true);try{const x=await api.saveCombinedCollection({client_id:r.id,date,installment:loanCount,savings_amount:sav,withdrawal_type:e.withdrawalType,withdrawal_amount:w,notes:e.notes});if(!x?.success)throw new Error(x?.error||x?.message||'Unable to save collection');Alert.alert('Collection saved',`${r.name}\n${x.message||'Transaction completed successfully.'}`);await loadUnion()}catch(e:any){Alert.alert('Collection failed',e?.message||'Unable to save collection')}finally{setSaving(false)}};
  const reset=(r:Row)=>setEdits(p=>({...p,[r.id]:blank()}));
  const loanTotal=filtered.reduce((s,r)=>s+Number(r.loan?.remaining_balance||0),0);const savingsTotal=filtered.reduce((s,r)=>s+Number(r.savings_balance||0),0);const totalLoan=filtered.reduce((s,r)=>s+num(edits[r.id]?.installment),0);const totalSavings=filtered.reduce((s,r)=>s+num(edits[r.id]?.savings),0);const totalWithdrawal=filtered.reduce((s,r)=>s+num(edits[r.id]?.withdrawal),0);const netTotal=totalLoan+totalSavings-totalWithdrawal;
@@ -61,7 +81,107 @@ export default function CombinedCollectionScreen(){
   <LinearGradient colors={[roleCfg.accent,colors.gradientEnd]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.hero}><View style={styles.heroTop}><View style={{flex:1}}><Text style={styles.heroEyebrow}>{greeting}</Text><Text style={styles.heroName}>{firstName}</Text></View><View style={styles.heroRole}><Text style={styles.heroRoleText}>{roleCfg.shortLabel}</Text></View></View><Text style={styles.heroDescription}>{roleCfg.description}</Text>{(location.zone||location.area||location.branch)?<View style={styles.heroLocation}><Ionicons name="location" size={14} color="#fff"/><Text style={styles.heroLocationLabel}>ASSIGNED</Text><Text style={styles.heroLocationValue} numberOfLines={1}>{[location.zone,location.area,location.branch].filter(Boolean).join(' › ')}</Text></View>:null}<View style={styles.heroBottom}><Text style={styles.statusText}>Account active</Text><Ionicons name="sparkles-outline" size={20} color="rgba(255,255,255,.8)"/></View></LinearGradient>
   <View style={styles.pageSectionHeader}><View><Text style={[styles.pageSectionTitle,{color:colors.text}]}>Combined Collection</Text><Text style={[styles.pageSectionSubtitle,{color:colors.textSecondary}]}>Daily client collection register</Text></View><View style={[styles.pageSectionPill,{backgroundColor:colors.infoBg}]}><Text style={[styles.pageSectionPillText,{color:colors.primary}]}>COLLECTION</Text></View></View>
   <View style={[styles.summary,{backgroundColor:colors.card,borderColor:colors.border}]}><Summary icon="people-outline" label="CLIENTS" value={filtered.length} color={colors.primary} colors={colors}/><View style={[styles.divider,{backgroundColor:colors.border}]}/><Summary icon="wallet-outline" label="SAVINGS" value={money(savingsTotal)} color="#16A34A" colors={colors}/><View style={[styles.divider,{backgroundColor:colors.border}]}/><Summary icon="cash-outline" label="LOAN BALANCE" value={money(loanTotal)} color="#7C3AED" colors={colors}/></View>
-  <Pressable onPress={openDatePicker} style={[styles.control,{backgroundColor:colors.card,borderColor:colors.border}]}><View style={styles.dateIcon}><Ionicons name="calendar-outline" size={18} color={colors.primary}/></View><View style={{flex:1}}><Text style={[styles.caption,{color:colors.textMuted}]}>COLLECTION DATE{Number(settings.date_readonly)===1?' • LOCKED':''}</Text><Text style={[styles.dateInput,{color:colors.text}]}>{date}</Text></View><Pressable onPress={e=>{e.stopPropagation();autofill()}} style={[styles.auto,{backgroundColor:'rgba(59,130,246,.10)'}]}><Ionicons name="flash-outline" size={15} color={colors.primary}/><Text style={[styles.autoText,{color:colors.primary}]}>AUTO FILL</Text></Pressable></Pressable>
+  {Platform.OS==='web' ? (
+    <View style={[styles.control,{backgroundColor:colors.card,borderColor:colors.border}]}>
+      <View style={styles.dateIcon}>
+        <Ionicons name="calendar-outline" size={18} color={colors.primary}/>
+      </View>
+      <View style={{flex:1}}>
+        <Text style={[styles.caption,{color:colors.textMuted}]}>
+          COLLECTION DATE{dateLocked?' • LOCKED':' • UNLOCKED'}
+        </Text>
+        <TextInput
+          value={date}
+          onChangeText={v=>{
+            if(!dateLocked && /^\d{4}-\d{2}-\d{2}$/.test(v)){
+              setDate(v);
+            }
+          }}
+          editable={!dateLocked}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={colors.textMuted}
+          style={[
+            styles.dateInput,
+            {
+              color:colors.text,
+              opacity:dateLocked?0.55:1
+            }
+          ]}
+        />
+      </View>
+      <View style={[styles.auto,{backgroundColor:'rgba(59,130,246,.10)'}]}>
+        <Ionicons name="calendar-outline" size={15} color={colors.primary}/>
+      </View>
+    </View>
+  ) : (
+    <>
+      <Pressable
+        onPress={openDatePicker}
+        style={[
+          styles.control,
+          {
+            backgroundColor:colors.card,
+            borderColor:colors.border,
+            opacity:dateLocked?0.65:1
+          }
+        ]}
+      >
+        <View style={styles.dateIcon}>
+          <Ionicons name="calendar-outline" size={18} color={colors.primary}/>
+        </View>
+        <View style={{flex:1}}>
+          <Text style={[styles.caption,{color:colors.textMuted}]}>
+            COLLECTION DATE{dateLocked?' • LOCKED':' • UNLOCKED • TAP TO CHANGE'}
+          </Text>
+          <Text style={[styles.dateInput,{color:colors.text}]}>{date}</Text>
+        </View>
+        <Pressable
+          onPress={e=>{
+            e.stopPropagation();
+            if(!dateLocked)autofill();
+          }}
+          style={[styles.auto,{backgroundColor:'rgba(59,130,246,.10)'}]}
+        >
+          <Ionicons name="flash-outline" size={15} color={colors.primary}/>
+        </Pressable>
+      </Pressable>
+
+      {showDatePicker&&!dateLocked ? (
+        <View
+          style={{
+            marginTop:8,
+            padding:10,
+            borderRadius:14,
+            backgroundColor:colors.card,
+            borderWidth:1,
+            borderColor:colors.border
+          }}
+        >
+          <DateTimePicker
+            value={parseDate(date)}
+            mode="date"
+            display={Platform.OS==='ios'?'inline':'calendar'}
+            onChange={handleDateChange}
+          />
+
+          {Platform.OS==='ios' ? (
+            <Pressable
+              onPress={()=>setShowDatePicker(false)}
+              style={{
+                marginTop:8,
+                paddingVertical:11,
+                borderRadius:10,
+                alignItems:'center',
+                backgroundColor:colors.primary
+              }}
+            >
+              <Text style={{color:'#fff',fontWeight:'800'}}>DONE</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+    </>
+  )}
   {Platform.OS==='ios'&&showDatePicker?<DateTimePicker value={parseDate(date)} mode="date" display="inline" onChange={handleDateChange}/>:null}
   <View style={styles.sectionHeader}><Text style={[styles.section,{color:colors.text}]}>UNION GROUPS</Text><Text style={[styles.hint,{color:colors.textMuted}]}>{unions.length} groups</Text></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>{unions.map(u=><Pressable key={u} onPress={()=>{setActiveUnion(u);setQuery('')}} style={[styles.tab,{backgroundColor:colors.card,borderColor:colors.border},activeUnion===u&&{backgroundColor:colors.primary,borderColor:colors.primary}]}><Text style={[styles.tabText,{color:activeUnion===u?'#fff':colors.textSecondary}]}>{u}</Text></Pressable>)}</ScrollView>
   <View style={[styles.toolbar,{backgroundColor:colors.card,borderColor:colors.border}]}><View style={styles.toolbarTop}><Text style={styles.activeText}>ACTIVE CLIENTS</Text><Text style={[styles.count,{color:colors.text}]}>{rows.length} in {activeUnion||'group'}</Text></View><View style={[styles.search,{backgroundColor:colors.inputBg,borderColor:colors.inputBorder}]}><Ionicons name="search-outline" size={16} color={colors.textMuted}/><TextInput value={query} onChangeText={setQuery} placeholder="Search client name or ID" placeholderTextColor={colors.textMuted} style={[styles.searchInput,{color:colors.text}]}/>{query?<Pressable onPress={()=>setQuery('')}><Ionicons name="close-circle" size={17} color={colors.textMuted}/></Pressable>:null}</View></View>
