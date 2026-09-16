@@ -1,116 +1,190 @@
-import { useState } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { ClientPicker } from '../../src/components/ClientPicker';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from 'expo-router';
+import { useAuthStore } from '../../src/store/auth';
 import { useThemeStore } from '../../src/store/theme';
-import { SPACING, RADIUS } from '../../src/constants/config';
+import { getRoleConfig } from '../../src/constants/roles';
+import { api } from '../../src/api/client';
 import type { Client } from '../../src/types';
 
-export default function SavingsCollectionScreen() {
-  const colors = useThemeStore((s) => s.colors);
-  const [client, setClient] = useState<Client | null>(null);
-  const [amount, setAmount] = useState('');
-  const [notes, setNotes] = useState('');
-  const [loading, setLoading] = useState(false);
+const money = (v: any) => `₦${Number(v || 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const parseDate = (value: string) => { const [y, m, d] = value.split('-').map(Number); const x = new Date(); x.setHours(12, 0, 0, 0); if (y && m && d) x.setFullYear(y, m - 1, d); return x; };
+const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-  const submit = async () => {
-    if (!client) return Alert.alert('Required', 'Please select a client');
-    const value = parseFloat(amount.replace(/,/g, ''));
-    if (!value || value <= 0) return Alert.alert('Required', 'Enter a valid amount');
+type Settings = { min_savings_amount: number; max_savings_amount: number; allow_weekend_collection: number; savings_date_readonly: number };
+type Row = Client & { savings_balance: number; amount: string; notes: string };
+const defaultSettings: Settings = { min_savings_amount: 100, max_savings_amount: 1000000, allow_weekend_collection: 0, savings_date_readonly: 0 };
+
+export default function SavingsCollectionScreen() {
+  const user = useAuthStore((s) => s.user);
+  const colors = useThemeStore((s) => s.colors);
+  const roleCfg = getRoleConfig(user?.role);
+  const [date, setDate] = useState(today());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [unions, setUnions] = useState<string[]>([]);
+  const [activeUnion, setActiveUnion] = useState('');
+  const [rows, setRows] = useState<Row[]>([]);
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [loadingRows, setLoadingRows] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const displayName = user?.full_name || user?.name || user?.username || 'User';
+  const firstName = displayName.trim().split(/\s+/)[0] || displayName;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'GOOD MORNING' : hour < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
+  const dateLocked = Number(settings.savings_date_readonly) === 1 || String(settings.savings_date_readonly).toLowerCase() === 'true';
+
+  const loadUnions = useCallback(async () => {
     setLoading(true);
     try {
-      const { collectSavingsOnlineOrQueue } = await import('../../src/services/data');
-      const res = await collectSavingsOnlineOrQueue({
-        client_id: client.id,
-        amount: value,
-        notes: notes || undefined,
-      });
-      if (res?.success) {
-        Alert.alert('Success', res.message || `Savings of ₦${value.toLocaleString()} recorded.`, [
-          { text: 'OK', onPress: () => { setAmount(''); setNotes(''); } },
-        ]);
-      } else {
-        Alert.alert('Error', res?.error || 'Failed to save');
-      }
+      const r = await api.getClients({ limit: 100, offset: 0 });
+      const active = (r.data || []).filter((c: any) => String(c.status || '').toLowerCase() === 'active');
+      setClients(active);
+      const names = Array.from(new Set(active.map((c: any) => String(c.union || '').trim() || 'Unassigned'))).sort((a, b) => a.localeCompare(b));
+      setUnions(names);
+      setActiveUnion((prev) => prev && names.includes(prev) ? prev : (names[0] || ''));
     } catch (e: any) {
-      const msg = e?.response?.data?.error || e?.message || 'Failed to save. Is API v1.2 deployed?';
-      Alert.alert('Error', msg);
-    } finally {
-      setLoading(false);
+      Alert.alert('Unable to load clients', e?.message || 'Please try again.');
+    } finally { setLoading(false); }
+  }, []);
+
+  const loadUnion = useCallback(async () => {
+    if (!activeUnion) { setRows([]); return; }
+    setLoadingRows(true);
+    try {
+      const selected = clients.filter((c) => (String(c.union || '').trim() || 'Unassigned') === activeUnion);
+      const loaded = await Promise.all(selected.map(async (client) => {
+        try {
+          const portfolio = await api.getPortfolio(client.id);
+          return { ...client, savings_balance: Number(portfolio?.savings?.balance || 0), amount: '', notes: '' };
+        } catch {
+          return { ...client, savings_balance: 0, amount: '', notes: '' };
+        }
+      }));
+      setRows(loaded.sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (e: any) {
+      Alert.alert('Unable to load union', e?.message || 'Please try again.');
+    } finally { setLoadingRows(false); }
+  }, [activeUnion, clients]);
+
+  useFocusEffect(useCallback(() => { loadUnions(); }, [loadUnions]));
+  useEffect(() => { loadUnion(); }, [loadUnion]);
+
+  const refresh = async () => { setRefreshing(true); await loadUnions(); setRefreshing(false); };
+  const filtered = useMemo(() => rows.filter((r) => r.name.toLowerCase().includes(query.trim().toLowerCase()) || r.id.toLowerCase().includes(query.trim().toLowerCase())), [rows, query]);
+  const totalEntered = filtered.reduce((sum, r) => sum + (Number(String(r.amount).replace(/,/g, '')) || 0), 0);
+  const totalBalances = filtered.reduce((sum, r) => sum + Number(r.savings_balance || 0), 0);
+  const enteredCount = filtered.filter((r) => Number(String(r.amount).replace(/,/g, '')) > 0).length;
+
+  const setRow = (id: string, key: 'amount' | 'notes', value: string) => setRows((prev) => prev.map((r) => r.id === id ? { ...r, [key]: value } : r));
+
+  const handleDateChange = (event: DateTimePickerEvent, selected?: Date) => {
+    if (dateLocked) return;
+    if (event.type === 'set' && selected) setDate(formatDate(selected));
+    if (Platform.OS !== 'ios' || event.type === 'dismissed') setShowDatePicker(false);
+  };
+
+  const openDatePicker = () => {
+    if (dateLocked) { Alert.alert('Date locked', 'The administrator has locked the savings collection date.'); return; }
+    setShowDatePicker(true);
+  };
+
+  const saveRow = async (row: Row) => {
+    const amount = Number(String(row.amount).replace(/,/g, '')) || 0;
+    if (amount < settings.min_savings_amount || amount > settings.max_savings_amount) {
+      Alert.alert('Savings limit', `Savings must be between ${money(settings.min_savings_amount)} and ${money(settings.max_savings_amount)}.`);
+      return;
     }
+    const day = parseDate(date).getDay();
+    if ((day === 0 || day === 6) && !Number(settings.allow_weekend_collection)) {
+      Alert.alert('Weekend collection disabled', 'The administrator has disabled weekend savings collections.');
+      return;
+    }
+    setSavingId(row.id);
+    try {
+      const res = await api.collectSavings({ client_id: row.id, amount, date, notes: row.notes || undefined });
+      if (!res?.success) throw new Error(res?.error || res?.message || 'Unable to save savings collection.');
+      Alert.alert('Collection saved', `${row.name}\n${res.message || 'Savings recorded successfully.'}`);
+      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, savings_balance: Number(r.savings_balance || 0) + amount, amount: '', notes: '' } : r));
+    } catch (e: any) {
+      Alert.alert('Collection failed', e?.message || 'Unable to save savings collection.');
+    } finally { setSavingId(null); }
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        style={{ flex: 1, backgroundColor: colors.background }}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={[styles.banner, { backgroundColor: 'rgba(34,197,94,0.12)' }]}>
-          <Ionicons name="wallet" size={22} color="#22C55E" />
-          <Text style={[styles.bannerText, { color: '#16A34A' }]}>
-            Record a savings deposit for a client
-          </Text>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}>
+        <LinearGradient colors={[roleCfg.accent, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+          <View style={styles.heroTop}><View style={{ flex: 1 }}><Text style={styles.heroEyebrow}>{greeting}</Text><Text style={styles.heroName}>{firstName}</Text></View><View style={styles.heroRole}><Text style={styles.heroRoleText}>{roleCfg.shortLabel}</Text></View></View>
+          <Text style={styles.heroDescription}>Record daily savings deposits for your assigned clients.</Text>
+        </LinearGradient>
+
+        <View style={styles.sectionHeader}><View><Text style={[styles.title, { color: colors.text }]}>Savings Collection</Text><Text style={[styles.subtitle, { color: colors.textSecondary }]}>Union-based daily collection register</Text></View><View style={[styles.pill, { backgroundColor: colors.infoBg }]}><Text style={[styles.pillText, { color: colors.primary }]}>SAVINGS</Text></View></View>
+
+        <View style={[styles.summary, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Summary icon="people-outline" label="CLIENTS" value={filtered.length} colors={colors} />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <Summary icon="wallet-outline" label="BALANCE" value={money(totalBalances)} colors={colors} />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <Summary icon="cash-outline" label="TODAY" value={money(totalEntered)} colors={colors} />
         </View>
 
-        <Text style={[styles.label, { color: colors.textSecondary }]}>Client</Text>
-        <ClientPicker selected={client} onSelect={setClient} />
+        <View style={[styles.control, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.controlIcon, { backgroundColor: colors.infoBg }]}><Ionicons name="calendar-outline" size={18} color={colors.primary} /></View>
+          <Pressable style={{ flex: 1 }} onPress={openDatePicker}><Text style={[styles.caption, { color: colors.textMuted }]}>COLLECTION DATE{dateLocked ? ' • LOCKED' : ' • TAP TO CHANGE'}</Text><Text style={[styles.dateValue, { color: colors.text }]}>{date}</Text></Pressable>
+          <Ionicons name={dateLocked ? 'lock-closed' : 'chevron-forward'} size={17} color={colors.textMuted} />
+        </View>
+        {showDatePicker && Platform.OS === 'android' ? <DateTimePicker value={parseDate(date)} mode="date" display="calendar" onChange={handleDateChange} /> : null}
+        {showDatePicker && Platform.OS === 'ios' ? <DateTimePicker value={parseDate(date)} mode="date" display="spinner" onChange={handleDateChange} /> : null}
 
-        <Text style={[styles.label, { color: colors.textSecondary }]}>Amount (₦)</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-          placeholder="0.00"
-          placeholderTextColor={colors.textMuted}
-          keyboardType="decimal-pad"
-          value={amount}
-          onChangeText={setAmount}
-        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+          {unions.map((union) => { const active = union === activeUnion; const count = clients.filter((c) => (String(c.union || '').trim() || 'Unassigned') === union).length; return <Pressable key={union} onPress={() => setActiveUnion(union)} style={[styles.tab, { backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border }]}><Ionicons name={active ? 'people' : 'people-outline'} size={15} color={active ? '#fff' : colors.textSecondary} /><Text style={[styles.tabText, { color: active ? '#fff' : colors.text }]} numberOfLines={1}>{union}</Text><View style={[styles.count, { backgroundColor: active ? 'rgba(255,255,255,.2)' : colors.infoBg }]}><Text style={[styles.countText, { color: active ? '#fff' : colors.primary }]}>{count}</Text></View></Pressable>; })}
+        </ScrollView>
 
-        <Text style={[styles.label, { color: colors.textSecondary }]}>Notes (optional)</Text>
-        <TextInput
-          style={[styles.input, styles.notes, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-          placeholder="Any remarks..."
-          placeholderTextColor={colors.textMuted}
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-        />
+        <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.border }]}><Ionicons name="search-outline" size={18} color={colors.textMuted} /><TextInput value={query} onChangeText={setQuery} placeholder="Search client..." placeholderTextColor={colors.textMuted} style={[styles.searchInput, { color: colors.text }]} /></View>
 
-        <TouchableOpacity onPress={submit} disabled={loading} activeOpacity={0.85}>
-          <LinearGradient
-            colors={['#22C55E', '#16A34A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.btn}
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : (
-              <Text style={styles.btnText}>Collect Savings</Text>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
+        {loading || loadingRows ? <View style={styles.loading}><ActivityIndicator color={colors.primary} size="large" /><Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading clients...</Text></View> : filtered.length === 0 ? <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}><Ionicons name="people-outline" size={38} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No clients in this union</Text><Text style={[styles.emptyText, { color: colors.textSecondary }]}>Select another union or check the client assignment.</Text></View> : filtered.map((row) => (
+          <View key={row.id} style={[styles.clientCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.clientTop}><View style={[styles.avatar, { backgroundColor: colors.infoBg }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{row.name.split(/\s+/).slice(0, 2).map((x) => x[0]).join('').toUpperCase()}</Text></View><View style={{ flex: 1 }}><Text style={[styles.clientName, { color: colors.text }]}>{row.name}</Text><Text style={[styles.clientMeta, { color: colors.textSecondary }]}>{row.phone || row.id} • Balance {money(row.savings_balance)}</Text></View></View>
+            <View style={styles.amountRow}><View style={[styles.amountWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}><Text style={[styles.currency, { color: colors.primary }]}>₦</Text><TextInput value={row.amount} onChangeText={(v) => setRow(row.id, 'amount', v)} placeholder="0" placeholderTextColor={colors.textMuted} keyboardType="decimal-pad" style={[styles.amountInput, { color: colors.text }]} /></View><Pressable onPress={() => saveRow(row)} disabled={savingId === row.id} style={[styles.collectBtn, { backgroundColor: colors.primary, opacity: savingId === row.id ? 0.65 : 1 }]}>{savingId === row.id ? <ActivityIndicator color="#fff" /> : <><Ionicons name="checkmark" size={18} color="#fff" /><Text style={styles.collectText}>Collect</Text></>}</Pressable></View>
+            <TextInput value={row.notes} onChangeText={(v) => setRow(row.id, 'notes', v)} placeholder="Notes (optional)" placeholderTextColor={colors.textMuted} style={[styles.notes, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} />
+          </View>
+        ))}
+
+        <View style={[styles.footerTotal, { backgroundColor: colors.card, borderColor: colors.border }]}><View><Text style={[styles.footerLabel, { color: colors.textSecondary }]}>ENTERED COLLECTIONS</Text><Text style={[styles.footerCount, { color: colors.text }]}>{enteredCount} client{enteredCount === 1 ? '' : 's'}</Text></View><Text style={[styles.footerAmount, { color: colors.primary }]}>{money(totalEntered)}</Text></View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
+function Summary({ icon, label, value, colors }: any) { return <View style={styles.summaryItem}><Ionicons name={icon} size={18} color={colors.primary} /><Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{label}</Text><Text style={[styles.summaryValue, { color: colors.text }]}>{value}</Text></View>; }
+
 const styles = StyleSheet.create({
-  content: { padding: SPACING.md, paddingBottom: 40 },
-  banner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 12, borderRadius: RADIUS.md, marginBottom: 20,
-  },
-  bannerText: { flex: 1, fontSize: 13, fontWeight: '600' },
-  label: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
-  input: {
-    borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 14,
-    paddingVertical: 14, fontSize: 16, marginBottom: 16,
-  },
-  notes: { minHeight: 80, textAlignVertical: 'top' },
-  btn: { paddingVertical: 16, borderRadius: RADIUS.md, alignItems: 'center', marginTop: 8 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  content: { padding: 14, paddingBottom: 40 },
+  hero: { borderRadius: 18, padding: 18, marginBottom: 16 },
+  heroTop: { flexDirection: 'row', alignItems: 'center' },
+  heroEyebrow: { color: 'rgba(255,255,255,.75)', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  heroName: { color: '#fff', fontSize: 26, fontWeight: '900', marginTop: 2 },
+  heroRole: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: 'rgba(255,255,255,.18)' },
+  heroRoleText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  heroDescription: { color: 'rgba(255,255,255,.9)', fontSize: 13, marginTop: 10, lineHeight: 19 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  title: { fontSize: 20, fontWeight: '900' }, subtitle: { fontSize: 12, marginTop: 2 },
+  pill: { borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }, pillText: { fontSize: 10, fontWeight: '900' },
+  summary: { borderWidth: 1, borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  summaryItem: { flex: 1, alignItems: 'center', gap: 3 }, summaryLabel: { fontSize: 9, fontWeight: '800' }, summaryValue: { fontSize: 13, fontWeight: '900' }, divider: { width: 1, height: 34 },
+  control: { borderWidth: 1, borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 10 }, controlIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 10 }, caption: { fontSize: 9, fontWeight: '900', letterSpacing: .5 }, dateValue: { fontSize: 16, fontWeight: '800', marginTop: 2 },
+  tabs: { gap: 8, paddingVertical: 3, paddingBottom: 10 }, tab: { minHeight: 42, borderWidth: 1, borderRadius: 13, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 220 }, tabText: { fontSize: 12, fontWeight: '800', maxWidth: 145 }, count: { minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 }, countText: { fontSize: 10, fontWeight: '900' },
+  search: { borderWidth: 1, borderRadius: 13, minHeight: 46, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 10 }, searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },
+  loading: { paddingVertical: 50, alignItems: 'center', gap: 10 }, loadingText: { fontSize: 13 }, empty: { borderWidth: 1, borderRadius: 16, padding: 30, alignItems: 'center' }, emptyTitle: { fontSize: 16, fontWeight: '800', marginTop: 10 }, emptyText: { fontSize: 12, textAlign: 'center', marginTop: 5 },
+  clientCard: { borderWidth: 1, borderRadius: 16, padding: 13, marginBottom: 10 }, clientTop: { flexDirection: 'row', alignItems: 'center', gap: 10 }, avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' }, avatarText: { fontSize: 13, fontWeight: '900' }, clientName: { fontSize: 14, fontWeight: '900' }, clientMeta: { fontSize: 10, marginTop: 3 }, amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }, amountWrap: { flex: 1, borderWidth: 1, borderRadius: 12, minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }, currency: { fontSize: 17, fontWeight: '900' }, amountInput: { flex: 1, fontSize: 16, fontWeight: '800', marginLeft: 4 }, collectBtn: { minHeight: 48, borderRadius: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }, collectText: { color: '#fff', fontSize: 12, fontWeight: '900' }, notes: { borderWidth: 1, borderRadius: 12, minHeight: 42, paddingHorizontal: 12, marginTop: 8, fontSize: 12 },
+  footerTotal: { borderWidth: 1, borderRadius: 15, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }, footerLabel: { fontSize: 9, fontWeight: '900' }, footerCount: { fontSize: 13, fontWeight: '800', marginTop: 2 }, footerAmount: { fontSize: 19, fontWeight: '900' },
 });
