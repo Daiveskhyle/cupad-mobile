@@ -62,16 +62,19 @@ export default function CoLayout() {
               accessibilityRole="button"
               accessibilityLabel="Sign out"
               hitSlop={8}
-              style={{
+              style={({ pressed }) => ({
                 width: 38,
                 height: 38,
-                borderRadius: 19,
+                borderRadius: 12,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#FEE2E2',
-              }}
+                backgroundColor: pressed ? colors.infoBg : colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+                opacity: pressed ? 0.75 : 1,
+              })}
             >
-              <Ionicons name="log-out" size={22} color="#991B1B" />
+              <Ionicons name="log-out-outline" size={21} color={colors.primary} />
             </Pressable>
             <Pressable onPress={toggleTheme} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}>
               <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
