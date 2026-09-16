@@ -47,7 +47,7 @@ export default function TabsLayout() {
 
   const tabIcon = (focused: boolean, active: string, inactive: string, color: string, size: number) => (
     <View style={focused ? { width: 42, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}14` } : undefined}>
-      <Ionicons name={focused ? active : inactive} size={focused ? size + 1 : size} color={color} />
+      <Ionicons name={(focused ? active : inactive) as keyof typeof Ionicons.glyphMap} size={focused ? size + 1 : size} color={color} />
     </View>
   );
 
@@ -72,7 +72,7 @@ export default function TabsLayout() {
         ),
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 }}>
-            <Pressable onPress={confirmLogout} accessibilityRole="button" accessibilityLabel="Sign out" style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dangerBg || '#FEE2E2', marginRight: 4 }}>
+            <Pressable onPress={confirmLogout} accessibilityRole="button" accessibilityLabel="Sign out" style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger || '#FEE2E2', marginRight: 4 }}>
               <Ionicons name="log-out-outline" size={19} color={colors.danger || '#DC2626'} />
             </Pressable>
             <Pressable onPress={() => toggleTheme()} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg, marginRight: -2 }}>
