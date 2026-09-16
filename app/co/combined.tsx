@@ -32,6 +32,12 @@ const blockedTypes=(s:Settings)=>{try{const v=Array.isArray(s.blocked_withdrawal
 export default function CombinedCollectionScreen(){
  const user=useAuthStore(s=>s.user);const roleCfg=getRoleConfig(user?.role);const colors=useThemeStore(s=>s.colors);
  const [date,setDate]=useState(today());const [showDatePicker,setShowDatePicker]=useState(false);const [clients,setClients]=useState<Client[]>([]);const [unions,setUnions]=useState<string[]>([]);const [activeUnion,setActiveUnion]=useState('');const [rows,setRows]=useState<Row[]>([]);const [edits,setEdits]=useState<Record<string,Edit>>({});const [settings,setSettings]=useState<Settings>(defaultSettings);
+const [dashboardStats,setDashboardStats]=useState<any>(null);
+const [query,setQuery]=useState('');
+const [loading,setLoading]=useState(true);
+const [loadingRows,setLoadingRows]=useState(false);
+const [saving,setSaving]=useState(false);
+const [refreshing,setRefreshing]=useState(false);
  const dateLocked =
    settings.date_readonly === 1 ||
    String(settings.date_readonly).trim().toLowerCase() === '1' ||
