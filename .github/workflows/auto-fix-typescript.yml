@@ -16,13 +16,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply fixes
+      - name: Apply source fixes
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          # Restore missing state declarations in Combined Collection.
           p = Path('app/co/combined.tsx')
           s = p.read_text()
           needle = "const [settings,setSettings]=useState<Settings>(defaultSettings);"
@@ -36,10 +35,8 @@ jobs:
           if 'const [dashboardStats,setDashboardStats]' not in s:
               if needle not in s:
                   raise SystemExit('combined.tsx target state declaration not found')
-              s = s.replace(needle, replacement, 1)
-              p.write_text(s)
+              p.write_text(s.replace(needle, replacement, 1))
 
-          # Add the missing dashboard footer text style.
           p = Path('app/(tabs)/index.tsx')
           s = p.read_text()
           if 'footerText:' not in s:
@@ -47,16 +44,12 @@ jobs:
               if marker not in s:
                   raise SystemExit('index.tsx footerCard style not found')
               s = s.replace(marker, "  footerText: { fontSize: 12, fontWeight: '600' },\n" + marker, 1)
-              p.write_text(s)
 
-          # Make Recent Activity keys unique when transactions share the same timestamp/type.
-          p = Path('app/(tabs)/index.tsx')
-          s = p.read_text()
           old = "key={`${item.type}-${item.date || index}`}"
           new = "key={`${item.id ?? item.transaction_id ?? item.type}-${item.date ?? 'no-date'}-${index}`}"
           if old in s:
               s = s.replace(old, new, 1)
-              p.write_text(s)
+          p.write_text(s)
           PY
 
       - name: Verify TypeScript
@@ -69,7 +62,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/co/combined.tsx 'app/(tabs)/index.tsx' .github/workflows/auto-fix-typescript.yml
+          git add app/co/combined.tsx 'app/(tabs)/index.tsx'
           if git diff --cached --quiet; then
             echo "No changes needed"
             exit 0
