@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   fix:
-    if: ${{ !contains(github.event.head_commit.message, 'apply TypeScript fixes') && !contains(github.event.head_commit.message, 'TypeScript fixes applied') }}
+    if: ${{ !contains(github.event.head_commit.message, 'TypeScript fixes applied') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,16 +27,26 @@ jobs:
           s = p.read_text()
           needle = "const [settings,setSettings]=useState<Settings>(defaultSettings);"
           replacement = """const [settings,setSettings]=useState<Settings>(defaultSettings);
-           const [dashboardStats,setDashboardStats]=useState<any>(null);
-           const [query,setQuery]=useState('');
-           const [loading,setLoading]=useState(true);
-           const [loadingRows,setLoadingRows]=useState(false);
-           const [saving,setSaving]=useState(false);
-           const [refreshing,setRefreshing]=useState(false);"""
+          const [dashboardStats,setDashboardStats]=useState<any>(null);
+          const [query,setQuery]=useState('');
+          const [loading,setLoading]=useState(true);
+          const [loadingRows,setLoadingRows]=useState(false);
+          const [saving,setSaving]=useState(false);
+          const [refreshing,setRefreshing]=useState(false);"""
           if 'const [dashboardStats,setDashboardStats]' not in s:
               if needle not in s:
                   raise SystemExit('combined.tsx target state declaration not found')
               s = s.replace(needle, replacement, 1)
+              p.write_text(s)
+
+          # Add the missing dashboard footer text style.
+          p = Path('app/(tabs)/index.tsx')
+          s = p.read_text()
+          if 'footerText:' not in s:
+              marker = '  footerCard: {'
+              if marker not in s:
+                  raise SystemExit('index.tsx footerCard style not found')
+              s = s.replace(marker, "  footerText: { fontSize: 12, fontWeight: '600' },\n" + marker, 1)
               p.write_text(s)
 
           # Make Recent Activity keys unique when transactions share the same timestamp/type.
@@ -47,9 +57,6 @@ jobs:
           if old in s:
               s = s.replace(old, new, 1)
               p.write_text(s)
-
-          # Remove this one-shot workflow after applying the fix.
-          Path('.github/workflows/auto-fix-typescript.yml').unlink()
           PY
 
       - name: Verify TypeScript
