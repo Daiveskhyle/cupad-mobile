@@ -1,0 +1,71 @@
+name: Apply TypeScript fixes
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, 'apply TypeScript fixes') && !contains(github.event.head_commit.message, 'TypeScript fixes applied') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # Restore missing state declarations in Combined Collection.
+          p = Path('app/co/combined.tsx')
+          s = p.read_text()
+          needle = "const [settings,setSettings]=useState<Settings>(defaultSettings);"
+          replacement = """const [settings,setSettings]=useState<Settings>(defaultSettings);
+           const [dashboardStats,setDashboardStats]=useState<any>(null);
+           const [query,setQuery]=useState('');
+           const [loading,setLoading]=useState(true);
+           const [loadingRows,setLoadingRows]=useState(false);
+           const [saving,setSaving]=useState(false);
+           const [refreshing,setRefreshing]=useState(false);"""
+          if 'const [dashboardStats,setDashboardStats]' not in s:
+              if needle not in s:
+                  raise SystemExit('combined.tsx target state declaration not found')
+              s = s.replace(needle, replacement, 1)
+              p.write_text(s)
+
+          # Make Recent Activity keys unique when transactions share the same timestamp/type.
+          p = Path('app/(tabs)/index.tsx')
+          s = p.read_text()
+          old = "key={`${item.type}-${item.date || index}`}"
+          new = "key={`${item.id ?? item.transaction_id ?? item.type}-${item.date ?? 'no-date'}-${index}`}"
+          if old in s:
+              s = s.replace(old, new, 1)
+              p.write_text(s)
+
+          # Remove this one-shot workflow after applying the fix.
+          Path('.github/workflows/auto-fix-typescript.yml').unlink()
+          PY
+
+      - name: Verify TypeScript
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/combined.tsx 'app/(tabs)/index.tsx' .github/workflows/auto-fix-typescript.yml
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "TypeScript fixes applied"
+          git push
