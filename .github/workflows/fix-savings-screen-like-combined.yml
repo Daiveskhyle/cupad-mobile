@@ -1,0 +1,74 @@
+name: Fix Savings Screen Balance Logic
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-savings-screen-like-combined.yml'
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch savings screen to use Combined API balance logic
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/co/savings.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          old = '''      const selected = clients.filter((c) => (String(c.union || '').trim() || 'Unassigned') === activeUnion);
+      const loaded = await Promise.all(selected.map(async (client) => {
+        try {
+          const portfolio = await api.getPortfolio(client.id);
+          return {
+            ...client,
+            savings_balance: Number(portfolio?.savings?.balance || 0),
+            loan_outstanding: Number(portfolio?.loans?.outstanding || 0),
+            amount: '',
+          };
+        } catch {
+          return { ...client, savings_balance: 0, loan_outstanding: 0, amount: '', notes: '' };
+        }
+      }));
+      setRows(loaded.sort((a, b) => a.name.localeCompare(b.name)));'''
+
+          new = '''      // Use the same source as Combined Collection. The Combined API reads
+      // savings_balances.balance and disbursements.remaining_balance directly.
+      // This avoids the portfolio endpoint returning stale/zero aggregate values.
+      const unionName = activeUnion === 'Unassigned' ? '' : activeUnion;
+      const combinedRows = await api.getCombinedUnionData(unionName, date);
+      const selectedIds = new Set(clients.filter((c) => (String(c.union || '').trim() || 'Unassigned') === activeUnion).map((c) => String(c.id)));
+      const loaded = combinedRows
+        .filter((item: any) => selectedIds.has(String(item.id)))
+        .map((item: any) => {
+          const loan = item?.loan || null;
+          return {
+            ...clients.find((c) => String(c.id) === String(item.id)),
+            id: String(item.id),
+            name: String(item.name || clients.find((c) => String(c.id) === String(item.id))?.name || ''),
+            savings_balance: Number(item?.savings_balance || 0),
+            loan_outstanding: Number(loan?.remaining_balance || 0),
+            amount: '',
+          };
+        });
+      setRows(loaded.sort((a, b) => a.name.localeCompare(b.name)));'''
+
+          if old not in s:
+              raise SystemExit('Savings load block not found')
+
+          s = s.replace(old, new, 1)
+          s = s.replace("  }, [activeUnion, clients]);", "  }, [activeUnion, clients, date]);", 1)
+          p.write_text(s, encoding='utf-8')
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/savings.tsx
+          git diff --cached --quiet || git commit -m "fix: use combined balance logic on savings screen"
+          git push
