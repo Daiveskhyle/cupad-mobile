@@ -1,0 +1,59 @@
+name: Improve Combined Collection Table
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/co/combined.tsx'
+      - '.github/workflows/improve-combined-table.yml'
+
+jobs:
+  improve:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update Combined Collection UI
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/co/combined.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          # Remove optional notes from the edit model and reset state.
+          s = s.replace("type Edit={savings:string;installment:string;installmentCount:string;withdrawalType:string;withdrawal:string;notes:string};", "type Edit={savings:string;installment:string;installmentCount:string;withdrawalType:string;withdrawal:string};")
+          s = s.replace("const blank=():Edit=>({savings:'',installment:'',installmentCount:'',withdrawalType:'',withdrawal:'',notes:''});", "const blank=():Edit=>({savings:'',installment:'',installmentCount:'',withdrawalType:'',withdrawal:''});")
+          s = s.replace(",notes:e.notes", "")
+          s = s.replace("<TextInput value={e.notes} onChangeText={v=>setEdit(r.id,'notes',v)} placeholder=\"Note (optional)\" placeholderTextColor={colors.textMuted} style={[styles.noteInput,{color:colors.text,borderColor:colors.inputBorder,backgroundColor:colors.inputBg}]}/>", "")
+
+          # Give the table a clearer, denser professional register layout.
+          s = s.replace("table:{borderWidth:1,borderRadius:18,overflow:'hidden',minWidth:1005}", "table:{borderWidth:1,borderRadius:16,overflow:'hidden',minWidth:1005,elevation:2,shadowOpacity:.06,shadowRadius:8,shadowOffset:{width:0,height:2}}")
+          s = s.replace("tableTitle:{height:48,paddingHorizontal:15", "tableTitle:{height:50,paddingHorizontal:16")
+          s = s.replace("headerRow:{height:42,flexDirection:'row',borderBottomWidth:1}", "headerRow:{height:46,flexDirection:'row',borderBottomWidth:1,alignItems:'center'}")
+          s = s.replace("headText:{fontSize:9,fontWeight:'900',letterSpacing:.7}", "headText:{fontSize:9,fontWeight:'900',letterSpacing:.9,textTransform:'uppercase'}")
+          s = s.replace("row:{minHeight:155,flexDirection:'row',borderBottomWidth:1}", "row:{minHeight:148,flexDirection:'row',borderBottomWidth:1}")
+          s = s.replace("clientCell:{padding:13}", "clientCell:{padding:14}")
+          s = s.replace("inputCell:{padding:12}", "inputCell:{padding:13}")
+          s = s.replace("actionCell:{width:125}", "actionCell:{width:125,padding:12,justifyContent:'center'}")
+          s = s.replace("saveButton:{", "saveButton:{minHeight:38,borderRadius:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,")
+          s = s.replace("resetButton:{", "resetButton:{minHeight:34,borderRadius:9,alignItems:'center',justifyContent:'center',marginTop:6,")
+          s = s.replace("totalRow:{backgroundColor", "totalRow:{minHeight:66,flexDirection:'row',alignItems:'center',backgroundColor")
+
+          # Make quick installment controls easier to tap.
+          s = s.replace("quick:{width:30,height:27", "quick:{minWidth:34,height:30")
+          s = s.replace("quickText:{fontSize:9", "quickText:{fontSize:10")
+
+          # Remove obsolete note style if present.
+          import re
+          s = re.sub(r",?noteInput:\{[^}]*\}", "", s)
+
+          p.write_text(s, encoding='utf-8')
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/co/combined.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'Improve combined collection table and remove notes'
+          git push
