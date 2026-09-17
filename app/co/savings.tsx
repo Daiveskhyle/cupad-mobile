@@ -1,12 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
-import { useAuthStore } from '../../src/store/auth';
 import { useThemeStore } from '../../src/store/theme';
-import { getRoleConfig } from '../../src/constants/roles';
 import { api } from '../../src/api/client';
 import type { Client } from '../../src/types';
 
@@ -20,9 +17,7 @@ type Row = Client & { savings_balance: number; loan_outstanding: number; amount:
 const defaultSettings: Settings = { min_savings_amount: 100, max_savings_amount: 1000000, allow_weekend_collection: 0, savings_date_readonly: 0 };
 
 export default function SavingsCollectionScreen() {
-  const user = useAuthStore((s) => s.user);
   const colors = useThemeStore((s) => s.colors);
-  const roleCfg = getRoleConfig(user?.role);
   const [date, setDate] = useState(today());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
@@ -30,16 +25,11 @@ export default function SavingsCollectionScreen() {
   const [activeUnion, setActiveUnion] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingRows, setLoadingRows] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const displayName = user?.full_name || user?.name || user?.username || 'User';
-  const firstName = displayName.trim().split(/\s+/)[0] || displayName;
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'GOOD MORNING' : hour < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
   const dateLocked = Number(settings.savings_date_readonly) === 1 || String(settings.savings_date_readonly).toLowerCase() === 'true';
 
   const loadUnions = useCallback(async () => {
@@ -85,7 +75,7 @@ export default function SavingsCollectionScreen() {
   useEffect(() => { loadUnion(); }, [loadUnion]);
 
   const refresh = async () => { setRefreshing(true); await loadUnions(); setRefreshing(false); };
-  const filtered = useMemo(() => rows.filter((r) => r.name.toLowerCase().includes(query.trim().toLowerCase()) || r.id.toLowerCase().includes(query.trim().toLowerCase())), [rows, query]);
+  const filtered = rows;
   const totalEntered = filtered.reduce((sum, r) => sum + (Number(String(r.amount).replace(/,/g, '')) || 0), 0);
   const totalBalances = filtered.reduce((sum, r) => sum + Number(r.savings_balance || 0), 0);
   const enteredCount = filtered.filter((r) => Number(String(r.amount).replace(/,/g, '')) > 0).length;
@@ -128,11 +118,6 @@ export default function SavingsCollectionScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}>
-        <LinearGradient colors={[roleCfg.accent, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-          <View style={styles.heroTop}><View style={{ flex: 1 }}><Text style={styles.heroEyebrow}>{greeting}</Text><Text style={styles.heroName}>{firstName}</Text></View><View style={styles.heroRole}><Text style={styles.heroRoleText}>{roleCfg.shortLabel}</Text></View></View>
-          <Text style={styles.heroDescription}>Record daily savings deposits for your assigned clients.</Text>
-        </LinearGradient>
-
         <View style={styles.sectionHeader}><View><Text style={[styles.title, { color: colors.text }]}>Savings Collection</Text><Text style={[styles.subtitle, { color: colors.textSecondary }]}>Union-based daily collection register</Text></View><View style={[styles.pill, { backgroundColor: colors.infoBg }]}><Text style={[styles.pillText, { color: colors.primary }]}>SAVINGS</Text></View></View>
 
         <View style={[styles.summary, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -154,8 +139,6 @@ export default function SavingsCollectionScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
           {unions.map((union) => { const active = union === activeUnion; const count = clients.filter((c) => (String(c.union || '').trim() || 'Unassigned') === union).length; return <Pressable key={union} onPress={() => setActiveUnion(union)} style={[styles.tab, { backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border }]}><Ionicons name={active ? 'people' : 'people-outline'} size={15} color={active ? '#fff' : colors.textSecondary} /><Text style={[styles.tabText, { color: active ? '#fff' : colors.text }]} numberOfLines={1}>{union}</Text><View style={[styles.count, { backgroundColor: active ? 'rgba(255,255,255,.2)' : colors.infoBg }]}><Text style={[styles.countText, { color: active ? '#fff' : colors.primary }]}>{count}</Text></View></Pressable>; })}
         </ScrollView>
-
-        <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.border }]}><Ionicons name="search-outline" size={18} color={colors.textMuted} /><TextInput value={query} onChangeText={setQuery} placeholder="Search client..." placeholderTextColor={colors.textMuted} style={[styles.searchInput, { color: colors.text }]} /></View>
 
         {loading || loadingRows ? <View style={styles.loading}><ActivityIndicator color={colors.primary} size="large" /><Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading clients...</Text></View> : filtered.length === 0 ? <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}><Ionicons name="people-outline" size={38} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No clients in this union</Text><Text style={[styles.emptyText, { color: colors.textSecondary }]}>Select another union or check the client assignment.</Text></View> : filtered.map((row) => (
           <View key={row.id} style={[styles.clientCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -187,13 +170,6 @@ function Summary({ icon, label, value, colors }: any) { return <View style={styl
 
 const styles = StyleSheet.create({
   content: { padding: 14, paddingBottom: 40 },
-  hero: { borderRadius: 18, padding: 18, marginBottom: 16 },
-  heroTop: { flexDirection: 'row', alignItems: 'center' },
-  heroEyebrow: { color: 'rgba(255,255,255,.75)', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  heroName: { color: '#fff', fontSize: 26, fontWeight: '900', marginTop: 2 },
-  heroRole: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: 'rgba(255,255,255,.18)' },
-  heroRoleText: { color: '#fff', fontSize: 11, fontWeight: '900' },
-  heroDescription: { color: 'rgba(255,255,255,.9)', fontSize: 13, marginTop: 10, lineHeight: 19 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   title: { fontSize: 20, fontWeight: '900' }, subtitle: { fontSize: 12, marginTop: 2 },
   pill: { borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }, pillText: { fontSize: 10, fontWeight: '900' },
