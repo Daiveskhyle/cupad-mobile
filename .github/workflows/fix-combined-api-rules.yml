@@ -1,0 +1,39 @@
+name: Fix Combined API Rules In Mobile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-combined-api-rules.yml'
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch mobile combined request handling
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('app/co/combined.tsx')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace("const defaultSettings:Settings={max_installments_per_payment:3,", "const defaultSettings:Settings={max_installments_per_payment:2,")
+          s=s.replace("const allowedMax=(r:Row)=>Math.max(0,Math.min(2,Number(settings.max_installments_per_payment)||2,remainingInstallments(r)||2));", "const allowedMax=(r:Row)=>Math.max(0,Math.min(2,Number(settings.max_installments_per_payment)||2,remainingInstallments(r)||2));")
+          s=s.replace("const allowedMax=(r:Row)=>Math.max(0,Math.min(Number(settings.max_installments_per_payment)||3,remainingInstallments(r)||Number(settings.max_installments_per_payment)||3));", "const allowedMax=(r:Row)=>Math.max(0,Math.min(2,Number(settings.max_installments_per_payment)||2,remainingInstallments(r)||2));")
+          if "const selectedInstallments=Number(edits[r.id]?.installmentCount)||0;if(selectedInstallments>=2)" not in s:
+              old="const selectAdjustment=(r:Row,type:'withdrawal'|'return')=>{"
+              new="const selectAdjustment=(r:Row,type:'withdrawal'|'return')=>{const selectedInstallments=Number(edits[r.id]?.installmentCount)||0;if(selectedInstallments>=2){Alert.alert('Withdrawal not allowed','Withdrawal or Return cannot be processed when 2 installments are being repaid.');return}"
+              s=s.replace(old,new)
+          if "loanCount>=2&&['withdrawal','return']" not in s:
+              s=s.replace("if(loanCount>0&&['withdrawal','return'].includes(e.withdrawalType))return Alert.alert('Invalid combination','Repayment and Deduct/Return cannot be processed together.');", "if(loanCount>=2&&['withdrawal','return'].includes(e.withdrawalType))return Alert.alert('Invalid combination','Withdrawal or Return is not allowed when repaying 2 installments.');if(loanCount>0&&['withdrawal','return'].includes(e.withdrawalType))return Alert.alert('Invalid combination','Repayment and Deduct/Return cannot be processed together.');")
+          p.write_text(s,encoding='utf-8')
+      - name: Commit mobile patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/co/combined.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: enforce 2-installment combined collection rules'
+          git push
