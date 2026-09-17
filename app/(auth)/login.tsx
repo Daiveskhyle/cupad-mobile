@@ -49,6 +49,7 @@ export default function LoginScreen() {
   };
 
   const handleFingerprint = async () => {
+    if (biometricLoading || isLoading) return;
     if (Platform.OS === 'web') {
       Alert.alert('Biometric sign-in', 'Fingerprint authentication requires the Android or iOS app.');
       return;
@@ -75,8 +76,8 @@ export default function LoginScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.glowTop, { backgroundColor: colors.glowBlue }]} /><View style={[styles.glowBottom, { backgroundColor: colors.glowPurple }]} />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="always" keyboardDismissMode="none" showsVerticalScrollIndicator={false}>
           <View style={styles.topBar}><View><Text style={[styles.topBrand, { color: colors.text }]}>CUPAD</Text><Text style={[styles.topBrandSub, { color: colors.textMuted }]}>STAFF PORTAL</Text></View><TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={toggle} disabled={busy}><Ionicons name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'} size={20} color={colors.textSecondary} /></TouchableOpacity></View>
           <View style={styles.logoArea}>
             <View style={[styles.logoCircle, { backgroundColor: colors.card, borderColor: colors.primary + '25' }]}><Image source={require('../../assets/cupad-logo.png')} style={styles.logoImage} resizeMode="contain" accessibilityLabel="CUPAD logo" /></View>
