@@ -1,0 +1,40 @@
+name: Restore Combined Screen
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/restore-combined-screen.yml'
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore complete combined screen
+        run: |
+          git checkout 0af70f13c14a50561a4e0208ac6d5f3a6e4f9145 -- app/co/combined.tsx
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app/co/combined.tsx')
+          s = p.read_text()
+          s = s.replace("const money=(v:any)=>`₦${Number(v||0).toLocaleString('en-NG',{maximumFractionDigits:0})`;", "const money=(v:any)=>`₦${Number(v||0).toLocaleString('en-NG',{maximumFractionDigits:0})}`;")
+          p.write_text(s)
+          PY
+      - name: Commit restored screen
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/co/combined.tsx
+          git diff --cached --quiet || git commit -m 'restore: complete combined collection screen'
+          git push
+      - name: Remove restore workflow
+        run: |
+          git rm .github/workflows/restore-combined-screen.yml
+          git commit -m 'chore: remove temporary restore workflow'
+          git push
