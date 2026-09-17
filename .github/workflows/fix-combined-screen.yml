@@ -1,0 +1,32 @@
+name: Fix combined screen client roster
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.head_commit.message != 'fix: combined screen use client roster'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch combined screen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/co/combined.tsx')
+          s=p.read_text()
+          old=""" const loadUnion=useCallback(async()=>{if(!activeUnion){setRows([]);return}setLoadingRows(true);try{const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));setRows(d);setEdits(p=>{const n={...p};d.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0);const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):'',notes:''}}});return n})}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.')}finally{setLoadingRows(false)}},[activeUnion,date]);
+"""
+          new=""" const loadUnion=useCallback(async()=>{if(!activeUnion){setRows([]);return}setLoadingRows(true);try{const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));const byId=new Map<string,any>((Array.isArray(d)?d:[]).map((r:any)=>[String(r.id),r]));const visible=clients.filter((c:any)=>(String(c.union??'').trim()||'Unassigned')===activeUnion).map((c:any)=>{const r=byId.get(String(c.id));return r?{...r,id:c.id,name:c.name,savings_balance:Number(r.savings_balance||0)}:{id:c.id,name:c.name,loan:null,savings_balance:0,existing:{loan_amt:0,sav_amt:0,wth_type:'',wth_amt:0}};});setRows(visible);setEdits(p=>{const n={...p};visible.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0);const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):''}}});return n})}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.')}finally{setLoadingRows(false)}},[activeUnion,date,clients]);
+"""
+          if old not in s: raise SystemExit('combined loadUnion block not found')
+          p.write_text(s.replace(old,new))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/combined.tsx
+          git diff --cached --quiet || (git commit -m "fix: combined screen use client roster" && git push origin HEAD:main)
