@@ -19,6 +19,19 @@ class ApiClient {
   async updateProfile(payload:{full_name?:string;email?:string;current_password?:string;new_password?:string;profile_pic?:string}):Promise<User>{const{data}=await this.client.post<{success:boolean;data:User;error?:string;message?:string}>('/profile',payload);if(!data.success||!data.data)throw new ApiError(data.error||data.message||'Profile update failed.');return data.data}
   async logout(){await this.clearToken()}
   async getClients(params?:{q?:string;limit?:number;offset?:number}):Promise<ApiResponse<Client[]>>{const{data}=await this.client.get<ApiResponse<Client[]>>('/clients',{params});return data}
+  async getAllClients():Promise<Client[]> {
+    const all: Client[] = [];
+    const limit = 100;
+    let offset = 0;
+    while (true) {
+      const response = await this.getClients({ limit, offset });
+      const batch = Array.isArray(response.data) ? response.data : [];
+      all.push(...batch);
+      if (!response.pagination?.has_more || batch.length === 0) break;
+      offset += batch.length;
+    }
+    return all.filter((client) => String(client.status || '').toLowerCase() === 'active');
+  }
   async getPortfolio(clientId:string):Promise<Portfolio>{const{data}=await this.client.get<{success:boolean;data:Portfolio}>(`/clients/${encodeURIComponent(clientId)}/portfolio`);if(!data.success||!data.data)throw new ApiError('Failed to load client portfolio.');return data.data}
   async getSavings(clientId:string):Promise<Saving[]>{const{data}=await this.client.get<ApiResponse<Saving[]>>(`/clients/${encodeURIComponent(clientId)}/savings`);return data.data||[]}
   async getLoans(clientId:string):Promise<Loan[]>{const{data}=await this.client.get<ApiResponse<Loan[]>>(`/clients/${encodeURIComponent(clientId)}/loans`);return data.data||[]}
