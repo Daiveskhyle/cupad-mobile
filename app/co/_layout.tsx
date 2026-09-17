@@ -29,24 +29,34 @@ export default function CoLayout() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.card },
+          headerStyle: { backgroundColor: colors.card, elevation: 0, shadowOpacity: 0, height: 62, borderBottomWidth: 1, borderBottomColor: colors.border },
           headerTintColor: colors.primary,
           headerShadowVisible: false,
           headerTitleAlign: 'left',
           headerTitle: () => null,
           contentStyle: { backgroundColor: colors.background, paddingBottom: 70 },
           headerLeft: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 0, gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 14, gap: 8 }}>
               <Image source={{ uri: CUPAD_LOGO }} style={{ width: 32, height: 32 }} resizeMode="contain" />
               <Text style={{ color: colors.primary, fontSize: 20, fontWeight: '800', letterSpacing: 0.2 }}>CUPAD</Text>
             </View>
           ),
           headerRight: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 2 }}>
-              <Pressable onPress={toggleTheme} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 }}>
+              <Pressable
+                onPress={() => toggleTheme()}
+                accessibilityRole="button"
+                accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg, marginRight: -2 }}
+              >
                 <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
               </Pressable>
-              <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Open profile">
+              <Pressable
+                onPress={() => router.push('/(tabs)/profile')}
+                accessibilityRole="button"
+                accessibilityLabel="Open profile"
+                style={{ marginLeft: -2 }}
+              >
                 <View style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: colors.primary, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                   {profileUri ? <Image source={{ uri: profileUri }} style={{ width: '100%', height: '100%' }} /> : <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '800' }}>{initials}</Text>}
                 </View>
