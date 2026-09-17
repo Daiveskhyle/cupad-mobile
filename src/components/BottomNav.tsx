@@ -8,7 +8,7 @@ const items = [
   { label: 'Savings', icon: 'wallet-outline' as const, activeIcon: 'wallet' as const, route: '/co/savings' },
   { label: 'Combine', icon: 'cash-outline' as const, activeIcon: 'cash' as const, route: '/co/combined' },
   { label: 'Disburse', icon: 'arrow-up-circle-outline' as const, activeIcon: 'arrow-up-circle' as const, route: '/co/disbursement' },
-  { label: 'Profile', icon: 'person-outline' as const, activeIcon: 'person' as const, route: '/(tabs)/profile' },
+  { label: 'History', icon: 'time-outline' as const, activeIcon: 'time' as const, route: '/co/history' },
 ];
 
 export default function BottomNav() {
