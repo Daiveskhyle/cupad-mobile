@@ -1,0 +1,40 @@
+name: Fix Savings Collection
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-savings-duplicates.yml'
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch savings screen
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/co/savings.tsx')
+          s = p.read_text()
+          s = s.replace("type Row = Client & { savings_balance: number; loan_outstanding: number; amount: string; notes: string };", "type Row = Client & { savings_balance: number; loan_outstanding: number; amount: string };")
+          s = s.replace("            notes: ''\n", "")
+          s = s.replace("            amount: '',\n            notes: ''", "            amount: ''")
+          s = s.replace("const setRow = (id: string, key: 'amount' | 'notes', value: string) => setRows((prev) => prev.map((r) => r.id === id ? { ...r, [key]: value } : r));", "const setRow = (id: string, value: string) => setRows((prev) => prev.map((r) => r.id === id ? { ...r, amount: value } : r));")
+          s = s.replace("      const res = await api.collectSavings({ client_id: row.id, amount, date, notes: row.notes || undefined });", "      const existing = await api.getSavings(row.id);\n      const duplicate = existing.some((tx: any) => String(tx?.type || '').toLowerCase() === 'deposit' && String(tx?.date || '').slice(0, 10) === date);\n      if (duplicate) { Alert.alert('Duplicate transaction', `${row.name} already has a savings collection for ${date}.`); return; }\n      const res = await api.collectSavings({ client_id: row.id, amount, date });")
+          s = s.replace("{ ...r, savings_balance: Number(r.savings_balance || 0) + amount, amount: '', notes: '' }", "{ ...r, savings_balance: Number(r.savings_balance || 0) + amount, amount: '' }")
+          s = s.replace("onChangeText={(v) => setRow(row.id, 'amount', v)}", "onChangeText={(v) => setRow(row.id, v)}")
+          import re
+          s = re.sub(r'\n\s*<TextInput value=\{row\.notes\}[\s\S]*?style=\{\[styles\.notes[\s\S]*?\} />', '', s, count=1)
+          s = re.sub(r', notes: string', '', s)
+          s = re.sub(r'\n\s*notes:\s*\{[^\n]*\},?', '', s)
+          p.write_text(s)
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/savings.tsx
+          git diff --cached --quiet || git commit -m "fix: remove savings notes and block duplicate daily collections"
+          git push
