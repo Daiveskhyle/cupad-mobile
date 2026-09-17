@@ -1,0 +1,106 @@
+name: Fix Savings Persistent Balance
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch savings screen
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('app/co/savings.tsx')
+          text = p.read_text(encoding='utf-8')
+
+          pattern = re.compile(r"  const loadUnion = useCallback\(async \(\) => \{.*?\n  \}, \[activeUnion, clients, date\]\);", re.S)
+          replacement = r'''  const loadUnion = useCallback(async () => {
+    if (!activeUnion) { setRows([]); return; }
+    setLoadingRows(true);
+    try {
+      const selected = clients.filter((c) =>
+        (c.union === null || c.union === undefined || c.union === '' ? 'Unassigned' : String(c.union)) === activeUnion
+      );
+
+      // Read the persisted savings transaction history directly. The history is
+      // the durable record written by savings/collect, so a refresh cannot fall
+      // back to a stale Combined-Collection balance cache.
+      const loaded = await Promise.all(selected.map(async (client) => {
+        try {
+          const [transactions, combinedRows] = await Promise.all([
+            api.getSavings(client.id),
+            api.getCombinedUnionData(activeUnion, date).catch(() => []),
+          ]);
+
+          const txs = Array.isArray(transactions) ? transactions : [];
+          const ordered = [...txs].sort((a: any, b: any) => {
+            const ad = new Date(String(a?.date || a?.created_at || '')).getTime() || 0;
+            const bd = new Date(String(b?.date || b?.created_at || '')).getTime() || 0;
+            return ad - bd;
+          });
+
+          let historyBalance: number | null = null;
+          for (const tx of ordered) {
+            const after = Number(tx?.balance_after);
+            if (Number.isFinite(after)) historyBalance = after;
+          }
+
+          if (historyBalance === null) {
+            historyBalance = txs.reduce((sum: number, tx: any) => {
+              const amount = Number(tx?.amount || tx?.amount_collected || 0);
+              const type = String(tx?.type || '').toLowerCase();
+              if (['withdrawal', 'return', 'adjust', 'deduct'].includes(type)) return sum - Math.abs(amount);
+              return sum + amount;
+            }, 0);
+          }
+
+          const combined = (Array.isArray(combinedRows) ? combinedRows : []).find((item: any) => String(item?.id) === String(client.id));
+          const loan = Number(combined?.loan?.remaining_balance ?? 0);
+
+          return {
+            ...client,
+            savings_balance: Number.isFinite(historyBalance) ? Math.max(0, historyBalance) : 0,
+            loan_outstanding: Number.isFinite(loan) ? loan : 0,
+            amount: '',
+          };
+        } catch {
+          return { ...client, savings_balance: 0, loan_outstanding: 0, amount: '' };
+        }
+      }));
+
+      setRows(loaded.sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (e: any) {
+      Alert.alert('Unable to load union', e?.message || 'Please try again.');
+      setRows([]);
+    } finally { setLoadingRows(false); }
+  }, [activeUnion, clients, date]);'''
+
+          new_text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('Could not locate savings loadUnion block; no changes made.')
+
+          p.write_text(new_text, encoding='utf-8')
+          print('Savings screen patched successfully.')
+          PY
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/savings.tsx
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "fix: read persisted savings balance from transaction history"
+            git push
+          fi
