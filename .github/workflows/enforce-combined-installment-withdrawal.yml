@@ -1,0 +1,62 @@
+name: Enforce combined collection installment rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/co/combined.tsx'
+      - '.github/workflows/enforce-combined-installment-withdrawal.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply installment and withdrawal rules
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('app/co/combined.tsx')
+          s = p.read_text(encoding='utf-8')
+          original = s
+
+          # Hard cap combined collection repayments at 2 installments,
+          # regardless of the administrator/API setting.
+          old = "const allowedMax=(r:Row)=>Math.max(0,Math.min(Number(settings.max_installments_per_payment)||3,remainingInstallments(r)||Number(settings.max_installments_per_payment)||3));"
+          new = "const allowedMax=(r:Row)=>Math.max(0,Math.min(2,Number(settings.max_installments_per_payment)||2,remainingInstallments(r)||2));"
+          s = s.replace(old, new)
+
+          # Keep the default UI consistent with the hard maximum.
+          s = s.replace("max_installments_per_payment:3,min_installments_per_payment:1", "max_installments_per_payment:2,min_installments_per_payment:1")
+
+          # Prevent choosing any withdrawal/return adjustment when a double
+          # installment repayment has already been selected.
+          old = "const selectAdjustment=(r:Row,type:'withdrawal'|'return')=>{const blocked=blockedTypes(settings);"
+          new = "const selectAdjustment=(r:Row,type:'withdrawal'|'return')=>{const selectedInstallments=Number(edits[r.id]?.installmentCount)||0;if(selectedInstallments>=2){Alert.alert('Withdrawal not allowed','Withdrawal or Return cannot be processed when 2 installments are being repaid.');return}const blocked=blockedTypes(settings);"
+          s = s.replace(old, new)
+
+          # Also enforce the rule at save time so it cannot be bypassed by
+          # manually entering values.
+          old = "if(loanCount>0&&['withdrawal','return'].includes(e.withdrawalType))return Alert.alert('Invalid combination','Repayment and Deduct/Return cannot be processed together.');"
+          new = "if(loanCount>=2&&['withdrawal','return'].includes(e.withdrawalType))return Alert.alert('Invalid combination','Withdrawal or Return is not allowed when repaying 2 installments.');if(loanCount>0&&['withdrawal','return'].includes(e.withdrawalType))return Alert.alert('Invalid combination','Repayment and Deduct/Return cannot be processed together.');"
+          s = s.replace(old, new)
+
+          if s == original:
+              print('No changes required')
+          else:
+              p.write_text(s, encoding='utf-8')
+              print('Updated combined collection rules')
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/co/combined.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'Limit combined repayment to 2 installments and block withdrawal'
+          git push
