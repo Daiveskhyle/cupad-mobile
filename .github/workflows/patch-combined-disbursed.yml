@@ -9,30 +9,44 @@ permissions:
 
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, '[combined-disbursed]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[combined-client-disbursed]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Add disbursed amount to Combined Collection
+      - name: Move disbursed amount to each client
         shell: python
         run: |
           from pathlib import Path
           p = Path('app/co/combined.tsx')
           s = p.read_text(encoding='utf-8')
 
-          old_calc = "const loanTotal=filtered.reduce((s,r)=>s+Number(r.loan?.remaining_balance||0),0);const savingsTotal=filtered.reduce((s,r)=>s+Number(r.savings_balance||0),0);const totalLoan="
-          new_calc = "const loanTotal=filtered.reduce((s,r)=>s+Number(r.loan?.remaining_balance||0),0);const savingsTotal=filtered.reduce((s,r)=>s+Number(r.savings_balance||0),0);const disbursedTotal=filtered.reduce((s,r)=>s+principal(r),0);const totalLoan="
+          # Remove the disbursed total from the top summary calculation.
+          old_calc = "const loanTotal=filtered.reduce((s,r)=>s+Number(r.loan?.remaining_balance||0),0);const savingsTotal=filtered.reduce((s,r)=>s+Number(r.savings_balance||0),0);const disbursedTotal=filtered.reduce((s,r)=>s+principal(r),0);const totalLoan="
+          new_calc = "const loanTotal=filtered.reduce((s,r)=>s+Number(r.loan?.remaining_balance||0),0);const savingsTotal=filtered.reduce((s,r)=>s+Number(r.savings_balance||0),0);const totalLoan="
           if old_calc not in s:
-              raise SystemExit('Calculation anchor not found')
+              raise SystemExit('Disbursed total calculation anchor not found')
           s = s.replace(old_calc, new_calc, 1)
 
-          old_ui = '<Summary icon=\"cash-outline\" label=\"LOAN BALANCE\" value={money(loanTotal)} color=\"#7C3AED\" colors={colors}/></View>'
-          new_ui = '<Summary icon=\"cash-outline\" label=\"LOAN BALANCE\" value={money(loanTotal)} color=\"#7C3AED\" colors={colors}/><View style={[styles.divider,{backgroundColor:colors.border}]}/><Summary icon=\"trending-up-outline\" label=\"DISBURSED\" value={money(disbursedTotal)} color=\"#2563EB\" colors={colors}/></View>'
-          if old_ui not in s:
-              raise SystemExit('Summary UI anchor not found')
-          s = s.replace(old_ui, new_ui, 1)
+          # Remove the disbursed summary card from the page header.
+          old_summary = "<View style={[styles.divider,{backgroundColor:colors.border}]}/><Summary icon=\"trending-up-outline\" label=\"DISBURSED\" value={money(disbursedTotal)} color=\"#2563EB\" colors={colors}/></View>"
+          new_summary = "</View>"
+          if old_summary not in s:
+              raise SystemExit('Disbursed summary UI anchor not found')
+          s = s.replace(old_summary, new_summary, 1)
+
+          # Add disbursed amount to every client's balance section.
+          old_client = "<Text style={[styles.balanceText,{color:'#7C3AED'}]}>Loan <Text style={styles.strong}>{money(r.loan?.remaining_balance)}</Text></Text>"
+          new_client = "<Text style={[styles.balanceText,{color:colors.textSecondary}]}>Savings <Text style={styles.strong}>{money(r.savings_balance)}</Text></Text><Text style={[styles.balanceText,{color:'#2563EB'}]}>Disbursed <Text style={styles.strong}>{money(principal(r))}</Text></Text><Text style={[styles.balanceText,{color:'#7C3AED'}]}>Loan Balance <Text style={styles.strong}>{money(r.loan?.remaining_balance)}</Text></Text>"
+          if old_client not in s:
+              raise SystemExit('Client balance anchor not found')
+          s = s.replace(old_client, new_client, 1)
+
+          # The replacement above duplicates the existing Savings line, so remove the original one.
+          duplicate = "<Text style={[styles.balanceText,{color:colors.textSecondary}]}>Savings <Text style={styles.strong}>{money(r.savings_balance)}</Text></Text><Text style={[styles.balanceText,{color:colors.textSecondary}]}>Savings <Text style={styles.strong}>{money(r.savings_balance)}</Text></Text>"
+          single = "<Text style={[styles.balanceText,{color:colors.textSecondary}]}>Savings <Text style={styles.strong}>{money(r.savings_balance)}</Text></Text>"
+          s = s.replace(duplicate, single, 1)
 
           p.write_text(s, encoding='utf-8')
 
@@ -40,7 +54,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/co/combined.tsx
+          git add app/co/combined.tsx .github/workflows/patch-combined-disbursed.yml
           git diff --cached --quiet && exit 0
-          git commit -m "feat: add disbursed amount to combined collection [combined-disbursed]"
+          git commit -m "feat: show disbursed amount per client in combined collection [combined-client-disbursed]"
           git push
