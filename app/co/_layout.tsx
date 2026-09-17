@@ -71,9 +71,9 @@ export default function CoLayout() {
                 onPress={handleLogout}
                 accessibilityRole="button"
                 accessibilityLabel="Sign out"
-                style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}
+                style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FCA5A5' }}
               >
-                <Ionicons name="log-out-outline" size={19} color={colors.primary} />
+                <Ionicons name="log-out-outline" size={19} color="#DC2626" />
               </Pressable>
             </View>
           ),
