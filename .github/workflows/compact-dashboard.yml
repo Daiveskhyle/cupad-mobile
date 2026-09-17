@@ -1,0 +1,48 @@
+name: Compact Dashboard UI
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  update-dashboard:
+    if: ${{ !contains(github.event.head_commit.message, 'Compact dashboard greeting') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compact greeting card and remove search banner
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/(tabs)/index.tsx')
+          s = p.read_text()
+
+          search = '''      {!isClient ? <TouchableOpacity style={styles.searchBanner} onPress={() => router.push('/(tabs)/search')} activeOpacity={0.85}><LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.searchBannerInner}><View style={styles.searchIcon}><Ionicons name="search" size={20} color="#fff" /></View><View style={{ flex: 1 }}><Text style={styles.searchTitle}>Search Clients</Text><Text style={styles.searchSubtitle}>Find a client, account or record</Text></View><Ionicons name="arrow-forward-circle" size={28} color="#fff" /></LinearGradient></TouchableOpacity> : null}\n\n'''
+          s = s.replace(search, '')
+
+          s = s.replace("hero: { minHeight: 205, borderRadius: 24, padding: 22, marginBottom: 14, overflow: 'hidden' }", "hero: { minHeight: 160, borderRadius: 20, padding: 16, marginBottom: 12, overflow: 'hidden' }")
+          s = s.replace("heroGlowOne: { position: 'absolute', width: 150, height: 150, borderRadius: 75, right: -45, top: -50", "heroGlowOne: { position: 'absolute', width: 125, height: 125, borderRadius: 63, right: -40, top: -42")
+          s = s.replace("heroGlowTwo: { position: 'absolute', width: 110, height: 110, borderRadius: 55, right: 45, bottom: -65", "heroGlowTwo: { position: 'absolute', width: 90, height: 90, borderRadius: 45, right: 35, bottom: -55")
+          s = s.replace("heroEyebrow: { color: 'rgba(255,255,255,0.72)', fontSize: 10, fontWeight: '800', letterSpacing: 1.5 }", "heroEyebrow: { color: 'rgba(255,255,255,0.72)', fontSize: 9, fontWeight: '800', letterSpacing: 1.3 }")
+          s = s.replace("heroName: { color: '#fff', fontSize: 29, lineHeight: 34, fontWeight: '900', marginTop: 3 }", "heroName: { color: '#fff', fontSize: 24, lineHeight: 29, fontWeight: '900', marginTop: 2 }")
+          s = s.replace("heroRole: { paddingHorizontal: 11, paddingVertical: 6", "heroRole: { paddingHorizontal: 9, paddingVertical: 5")
+          s = s.replace("heroRoleText: { color: '#fff', fontSize: 11, fontWeight: '800' }", "heroRoleText: { color: '#fff', fontSize: 10, fontWeight: '800' }")
+          s = s.replace("heroDescription: { color: 'rgba(255,255,255,0.84)', fontSize: 12, lineHeight: 18, marginTop: 13", "heroDescription: { color: 'rgba(255,255,255,0.84)', fontSize: 11, lineHeight: 16, marginTop: 8")
+          s = s.replace("heroLocation: { flexDirection: 'row', alignItems: 'center', minWidth: 0, marginTop: 13, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10", "heroLocation: { flexDirection: 'row', alignItems: 'center', minWidth: 0, marginTop: 8, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 9")
+          s = s.replace("heroBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14", "heroBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 9")
+          s = s.replace("<Ionicons name=\"sparkles-outline\" size={20}", "<Ionicons name=\"sparkles-outline\" size={18}")
+          s = s.replace("  searchBanner: { marginTop: 15, borderRadius: 18, overflow: 'hidden' }, searchBannerInner: { minHeight: 76, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15 }, searchIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }, searchTitle: { color: '#fff', fontSize: 14, fontWeight: '900' }, searchSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 3 },\n", '')
+          s = s.replace("skeletonHero: { minHeight: 205, borderRadius: 24, padding: 22, marginBottom: 14 }", "skeletonHero: { minHeight: 160, borderRadius: 20, padding: 16, marginBottom: 12 }")
+
+          p.write_text(s)
+      - name: Commit dashboard changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'app/(tabs)/index.tsx'
+          git rm '.github/workflows/compact-dashboard.yml'
+          git commit -m "Compact dashboard greeting and remove search banner"
+          git push
