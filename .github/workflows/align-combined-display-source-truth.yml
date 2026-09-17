@@ -1,0 +1,55 @@
+name: Align Combined Display With PHP Source Of Truth
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/align-combined-display-source-truth.yml'
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fix combined display fallbacks
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/co/combined.tsx')
+          s = p.read_text()
+
+          # API now supplies the source-of-truth installment amount. Do not
+          # invent a 23-installment fallback in the UI.
+          old = "const installment=(r:Row)=>Number(r.loan?.inst_amt||0)||((Number(r.loan?.total_payable||0))/(Number(r.loan?.num_installments)||23));"
+          new = "const installment=(r:Row)=>Number(r.loan?.inst_amt||0);"
+          if old not in s:
+              raise SystemExit('installment fallback not found')
+          s = s.replace(old, new, 1)
+
+          # total_payable is the repayment obligation, not the original
+          # disbursed principal. Never display it as Disbursed Amount.
+          old = "const principal=(r:Row)=>Number(r.loan?.principal||r.loan?.loan_amount||r.loan?.disbursed_amount||r.loan?.amount||r.loan?.total_payable||0);"
+          new = "const principal=(r:Row)=>Number(r.loan?.principal||r.loan?.loan_amount||r.loan?.disbursed_amount||r.loan?.amount||0);"
+          if old not in s:
+              raise SystemExit('principal fallback not found')
+          s = s.replace(old, new, 1)
+
+          old = "const inst=Number(r.loan?.inst_amt||0)||((Number(r.loan?.total_payable||0))/(Number(r.loan?.num_installments)||23));"
+          new = "const inst=Number(r.loan?.inst_amt||0);"
+          if old not in s:
+              raise SystemExit('edit initialization installment fallback not found')
+          s = s.replace(old, new, 1)
+
+          p.write_text(s)
+
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/combined.tsx
+          git diff --cached --quiet || git commit -m "fix: align combined display with source data"
+          git push
