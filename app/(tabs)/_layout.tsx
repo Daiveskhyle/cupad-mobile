@@ -5,6 +5,7 @@ import { useAuthStore } from '../../src/store/auth';
 import { useThemeStore } from '../../src/store/theme';
 import { getRoleConfig } from '../../src/constants/roles';
 import { API_BASE_URL } from '../../src/constants/config';
+import BottomNav from '../../src/components/BottomNav';
 
 const CUPAD_LOGO = 'https://cupad.name.ng/uploads/CUPAD%20LOGO.png';
 
@@ -16,7 +17,6 @@ export default function TabsLayout() {
   const themeMode = useThemeStore((s) => s.mode);
   const toggleTheme = useThemeStore((s) => s.toggle);
   const roleCfg = getRoleConfig(user?.role);
-  const accent = roleCfg.accent || colors.primary;
 
   if (!isLoading && !isAuthenticated) return <Redirect href="/(auth)/login" />;
 
@@ -31,20 +31,10 @@ export default function TabsLayout() {
     return `${origin}/${clean}`;
   })();
 
-  const tabIcon = (focused: boolean, active: string, inactive: string, color: string, size: number) => (
-    <View style={focused ? { width: 42, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: `${accent}14` } : undefined}>
-      <Ionicons name={(focused ? active : inactive) as keyof typeof Ionicons.glyphMap} size={focused ? size + 1 : size} color={color} />
-    </View>
-  );
-
   return (
     <Tabs
+      tabBar={() => <BottomNav />}
       screenOptions={{
-        tabBarActiveTintColor: accent,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: { backgroundColor: colors.card, borderTopWidth: 0, height: 72, paddingBottom: 10, paddingTop: 7, elevation: 12, shadowOpacity: colors.isDark ? 0.35 : 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: -4 } },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginTop: 1 },
-        tabBarItemStyle: { paddingVertical: 1 },
         headerStyle: { backgroundColor: colors.card, elevation: 0, shadowOpacity: 0, height: 62, borderBottomWidth: 1, borderBottomColor: colors.border },
         headerTintColor: colors.primary,
         headerTitleAlign: 'left',
@@ -58,7 +48,7 @@ export default function TabsLayout() {
         ),
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 }}>
-            <Pressable onPress={() => toggleTheme()} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg, marginRight: -2 }}>
+            <Pressable onPress={toggleTheme} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg, marginRight: -2 }}>
               <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
             </Pressable>
             <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Open profile" style={{ marginLeft: -2 }}>
@@ -70,9 +60,9 @@ export default function TabsLayout() {
         ),
       }}
     >
-      <Tabs.Screen name="index" options={{ title: `${roleCfg.shortLabel} Dashboard`, tabBarLabel: 'Home', tabBarIcon: ({ color, size, focused }) => tabIcon(focused, 'home', 'home-outline', color, size) }} />
-      <Tabs.Screen name="search" options={{ title: 'Search Clients', tabBarLabel: 'Clients', tabBarIcon: ({ color, size, focused }) => tabIcon(focused, 'people', 'people-outline', color, size) }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarLabel: 'Profile', tabBarIcon: ({ color, size, focused }) => tabIcon(focused, 'person', 'person-outline', color, size) }} />
+      <Tabs.Screen name="index" options={{ title: `${roleCfg.shortLabel} Dashboard` }} />
+      <Tabs.Screen name="search" options={{ title: 'Search Clients' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
   );
 }
