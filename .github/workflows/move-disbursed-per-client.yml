@@ -1,0 +1,50 @@
+name: Move Disbursed Amount Per Client
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[combined-client-disbursed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update Combined Collection
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/co/combined.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          old_calc = "const loanTotal=filtered.reduce((s,r)=>s+Number(r.loan?.remaining_balance||0),0);const savingsTotal=filtered.reduce((s,r)=>s+Number(r.savings_balance||0),0);const disbursedTotal=filtered.reduce((s,r)=>s+principal(r),0);const totalLoan="
+          new_calc = "const loanTotal=filtered.reduce((s,r)=>s+Number(r.loan?.remaining_balance||0),0);const savingsTotal=filtered.reduce((s,r)=>s+Number(r.savings_balance||0),0);const totalLoan="
+          if old_calc in s:
+              s = s.replace(old_calc, new_calc, 1)
+
+          old_summary = "<View style={[styles.divider,{backgroundColor:colors.border}]}/><Summary icon=\"trending-up-outline\" label=\"DISBURSED\" value={money(disbursedTotal)} color=\"#2563EB\" colors={colors}/></View>"
+          if old_summary in s:
+              s = s.replace(old_summary, "</View>", 1)
+
+          old_client = "<Text style={[styles.balanceText,{color:colors.textSecondary}]}>Savings <Text style={styles.strong}>{money(r.savings_balance)}</Text></Text><Text style={[styles.balanceText,{color:'#7C3AED'}]}>Loan <Text style={styles.strong}>{money(r.loan?.remaining_balance)}</Text></Text>"
+          new_client = "<Text style={[styles.balanceText,{color:colors.textSecondary}]}>Savings <Text style={styles.strong}>{money(r.savings_balance)}</Text></Text><Text style={[styles.balanceText,{color:'#2563EB'}]}>Disbursed Amount <Text style={styles.strong}>{money(principal(r))}</Text></Text><Text style={[styles.balanceText,{color:'#7C3AED'}]}>Loan Balance <Text style={styles.strong}>{money(r.loan?.remaining_balance)}</Text></Text>"
+          if old_client in s:
+              s = s.replace(old_client, new_client, 1)
+          else:
+              raise SystemExit('Client balance block not found')
+
+          p.write_text(s, encoding='utf-8')
+
+      - name: Commit update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/combined.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "feat: show disbursed amount per client in combined collection [combined-client-disbursed]"
+          git push
