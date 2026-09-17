@@ -37,7 +37,7 @@ export default function SavingsCollectionScreen() {
     try {
       const active = await api.getAllClients();
       setClients(active);
-      const names = Array.from(new Set(active.map((c: any) => String(c.union || '').trim() || 'Unassigned'))).sort((a, b) => a.localeCompare(b));
+      const names = Array.from(new Set(active.map((c: any) => c.union===null||c.union===undefined||c.union===''?'Unassigned':String(c.union)))).sort((a, b) => a.localeCompare(b));
       setUnions(names);
       setActiveUnion((prev) => prev && names.includes(prev) ? prev : (names[0] || ''));
     } catch (e: any) {
@@ -56,7 +56,7 @@ export default function SavingsCollectionScreen() {
       (Array.isArray(combinedRows) ? combinedRows : []).forEach((item: any) => byId.set(String(item.id), item));
 
       const loaded = clients
-        .filter((c) => (String(c.union || '').trim() || 'Unassigned') === activeUnion)
+        .filter((c) => (c.union===null||c.union===undefined||c.union===''?'Unassigned':String(c.union)) === activeUnion)
         .map((client) => {
           const item = byId.get(String(client.id));
           const savings = Number(item?.savings_balance ?? 0);
