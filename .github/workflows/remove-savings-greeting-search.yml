@@ -1,0 +1,66 @@
+name: Remove Savings Greeting and Client Search
+
+on:
+  push:
+    paths:
+      - '.github/workflows/remove-savings-greeting-search.yml'
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch savings screen
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app/co/savings.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          s = s.replace("import { useCallback, useEffect, useMemo, useState } from 'react';", "import { useCallback, useEffect, useState } from 'react';")
+          s = s.replace("import { LinearGradient } from 'expo-linear-gradient';\n", "")
+          s = s.replace("import { useAuthStore } from '../../src/store/auth';\n", "")
+          s = s.replace("import { getRoleConfig } from '../../src/constants/roles';\n", "")
+
+          s = s.replace("  const user = useAuthStore((s) => s.user);\n", "")
+          s = s.replace("  const roleCfg = getRoleConfig(user?.role);\n", "")
+          s = s.replace("  const [query, setQuery] = useState('');\n", "")
+          s = s.replace("  const displayName = user?.full_name || user?.name || user?.username || 'User';\n  const firstName = displayName.trim().split(/\\s+/)[0] || displayName;\n  const hour = new Date().getHours();\n  const greeting = hour < 12 ? 'GOOD MORNING' : hour < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';\n", "")
+
+          s = s.replace("  const filtered = useMemo(() => rows.filter((r) => r.name.toLowerCase().includes(query.trim().toLowerCase()) || r.id.toLowerCase().includes(query.trim().toLowerCase())), [rows, query]);", "  const filtered = rows;")
+
+          old_hero = '''        <LinearGradient colors={[roleCfg.accent, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>\n          <View style={styles.heroTop}><View style={{ flex: 1 }}><Text style={styles.heroEyebrow}>{greeting}</Text><Text style={styles.heroName}>{firstName}</Text></View><View style={styles.heroRole}><Text style={styles.heroRoleText}>{roleCfg.shortLabel}</Text></View></View>\n          <Text style={styles.heroDescription}>Record daily savings deposits for your assigned clients.</Text>\n        </LinearGradient>\n\n'''
+          s = s.replace(old_hero, '')
+
+          old_search = '''        <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.border }]}><Ionicons name="search-outline" size={18} color={colors.textMuted} /><TextInput value={query} onChangeText={setQuery} placeholder="Search client..." placeholderTextColor={colors.textMuted} style={[styles.searchInput, { color: colors.text }]} /></View>\n\n'''
+          s = s.replace(old_search, '')
+
+          # Remove now-unused greeting/search styles.
+          for block in [
+            "  hero: { borderRadius: 18, padding: 18, marginBottom: 16 },\n",
+            "  heroTop: { flexDirection: 'row', alignItems: 'center' },\n",
+            "  heroEyebrow: { color: 'rgba(255,255,255,.75)', fontSize: 11, fontWeight: '800', letterSpacing: 1 },\n",
+            "  heroName: { color: '#fff', fontSize: 26, fontWeight: '900', marginTop: 2 },\n",
+            "  heroRole: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: 'rgba(255,255,255,.18)' },\n",
+            "  heroRoleText: { color: '#fff', fontSize: 11, fontWeight: '900' },\n",
+            "  heroDescription: { color: 'rgba(255,255,255,.9)', fontSize: 13, marginTop: 10, lineHeight: 19 },\n",
+            "  search: { borderWidth: 1, borderRadius: 13, minHeight: 46, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 10 },\n",
+            "  searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },\n",
+          ]:
+            s = s.replace(block, '')
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/savings.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "ui: remove savings greeting and client search"
+          git push
