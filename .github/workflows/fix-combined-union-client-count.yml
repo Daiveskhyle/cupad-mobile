@@ -1,0 +1,50 @@
+name: Fix Combined Union Client Count
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fix-combined-union-client-count.yml'
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore and patch combined screen
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          path = Path('app/co/combined.tsx')
+
+          # Restore the complete working file from the commit immediately before
+          # the accidental overwrite, then make the client-source fix below.
+          subprocess.run(
+              ['git', 'checkout', '0af70f13c14a50561a4e0208ac6d5f3a6e4f9145', '--', 'app/co/combined.tsx'],
+              check=True,
+          )
+
+          s = path.read_text()
+
+          old = """const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));setRows(d);setEdits(p=>{const n={...p};d.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0)||((Number(r.loan?.total_payable||0))/(Number(r.loan?.num_installments)||23));const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):'',notes:''}}});return n})"""
+
+          new = """const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));const byId=new Map<string,any>();(Array.isArray(d)?d:[]).forEach((r:any)=>byId.set(String(r.id),r));const loaded=clients.filter((c:any)=>(String(c.union||'').trim()||'Unassigned')===activeUnion).map((c:any)=>byId.get(String(c.id))).filter(Boolean);setRows(loaded);setEdits(p=>{const n={...p};loaded.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0)||((Number(r.loan?.total_payable||0))/(Number(r.loan?.num_installments)||23));const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):''}}});return n})"""
+
+          if old not in s:
+              raise SystemExit('Combined loadUnion anchor not found')
+          s = s.replace(old, new, 1)
+          path.write_text(s)
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/combined.tsx
+          git diff --cached --quiet || git commit -m "fix: align combined rows with union client count"
+          git push
