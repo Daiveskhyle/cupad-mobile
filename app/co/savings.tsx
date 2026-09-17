@@ -35,8 +35,7 @@ export default function SavingsCollectionScreen() {
   const loadUnions = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await api.getClients({ limit: 100, offset: 0 });
-      const active = (r.data || []).filter((c: any) => String(c.status || '').toLowerCase() === 'active');
+      const active = await api.getAllClients();
       setClients(active);
       const names = Array.from(new Set(active.map((c: any) => String(c.union || '').trim() || 'Unassigned'))).sort((a, b) => a.localeCompare(b));
       setUnions(names);
