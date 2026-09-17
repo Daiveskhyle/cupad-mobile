@@ -15,39 +15,61 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Patch mobile union screens
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          # Savings: normalize union names consistently and use the client list
-          # as the visible roster, while merging API balances by client ID.
           p = Path('app/co/savings.tsx')
           s = p.read_text()
-          old = """      const loaded = clients\n        .filter((c) => (String(c.union || '').trim() || 'Unassigned') === activeUnion)\n        .map((client) => {\n          const item = byId.get(String(client.id));\n          const savings = Number(item?.savings_balance ?? 0);\n          const loan = Number(item?.loan?.remaining_balance ?? 0);\n          return {\n            ...client,\n            savings_balance: Number.isFinite(savings) ? savings : 0,\n            loan_outstanding: Number.isFinite(loan) ? loan : 0,\n            amount: '',\n          };\n        });\n"""
-          new = """      const normalizedUnion = (value: any) => String(value ?? '').trim() || 'Unassigned';\n      const loaded = clients\n        .filter((c) => normalizedUnion(c.union) === activeUnion)\n        .map((client) => {\n          const item = byId.get(String(client.id));\n          const savings = Number(item?.savings_balance ?? 0);\n          const loan = Number(item?.loan?.remaining_balance ?? 0);\n          return {\n            ...client,\n            savings_balance: Number.isFinite(savings) ? savings : 0,\n            loan_outstanding: Number.isFinite(loan) ? loan : 0,\n            amount: '',\n          };\n        });\n"""
+          old = """      const loaded = clients
+        .filter((c) => (String(c.union || '').trim() || 'Unassigned') === activeUnion)
+        .map((client) => {
+          const item = byId.get(String(client.id));
+          const savings = Number(item?.savings_balance ?? 0);
+          const loan = Number(item?.loan?.remaining_balance ?? 0);
+          return {
+            ...client,
+            savings_balance: Number.isFinite(savings) ? savings : 0,
+            loan_outstanding: Number.isFinite(loan) ? loan : 0,
+            amount: '',
+          };
+        });
+"""
+          new = """      const normalizedUnion = (value: any) => String(value ?? '').trim() || 'Unassigned';
+      const loaded = clients
+        .filter((c) => normalizedUnion(c.union) === activeUnion)
+        .map((client) => {
+          const item = byId.get(String(client.id));
+          const savings = Number(item?.savings_balance ?? 0);
+          const loan = Number(item?.loan?.remaining_balance ?? 0);
+          return {
+            ...client,
+            savings_balance: Number.isFinite(savings) ? savings : 0,
+            loan_outstanding: Number.isFinite(loan) ? loan : 0,
+            amount: '',
+          };
+        });
+"""
           if old not in s:
               raise SystemExit('Savings target block not found')
           s = s.replace(old, new)
-          s = s.replace("c.union === null || c.union === undefined || c.union === '' ? 'Unassigned' : String(c.union)", "String(c.union ?? '').trim() || 'Unassigned'")
-          s = s.replace("(String(c.union || '').trim() || 'Unassigned') === union", "(String(c.union ?? '').trim() || 'Unassigned') === union")
           p.write_text(s)
 
-          # Combined: keep every client from getAllClients in the selected union,
-          # then merge API collection/loan data by client ID. This prevents a
-          # count-only client from disappearing from the mobile table.
           p = Path('app/co/combined.tsx')
           s = p.read_text()
-          old = """ const loadUnion=useCallback(async()=>{if(!activeUnion){setRows([]);return}setLoadingRows(true);try{const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));setRows(d);setEdits(p=>{const n={...p};d.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0);const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):'',notes:''}}});return n})}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.')}finally{setLoadingRows(false)}},[activeUnion,date]);\n"""
-          new = """ const loadUnion=useCallback(async()=>{if(!activeUnion){setRows([]);return}setLoadingRows(true);try{const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));const byId=new Map<string,any>((Array.isArray(d)?d:[]).map((r:any)=>[String(r.id),r]));const visible=clients.filter((c:any)=>(String(c.union??'').trim()||'Unassigned')===activeUnion).map((c:any)=>{const r=byId.get(String(c.id));return r?{...r,id:c.id,name:c.name,savings_balance:Number(r.savings_balance||0)}:{id:c.id,name:c.name,loan:{},savings_balance:0,existing:{loan_amt:0,sav_amt:0,wth_type:'',wth_amt:0}};});setRows(visible);setEdits(p=>{const n={...p};visible.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0);const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):''}}});return n})}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.')}finally{setLoadingRows(false)}},[activeUnion,date,clients]);\n"""
+          old = """ const loadUnion=useCallback(async()=>{if(!activeUnion){setRows([]);return}setLoadingRows(true);try{const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));setRows(d);setEdits(p=>{const n={...p};d.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0);const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing?.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing?.wth_amt):'',notes:''}}});return n})}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.')}finally{setLoadingRows(false)}},[activeUnion,date]);
+"""
+          if old not in s:
+              old = """ const loadUnion=useCallback(async()=>{if(!activeUnion){setRows([]);return}setLoadingRows(true);try{const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));setRows(d);setEdits(p=>{const n={...p};d.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0);const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing?.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing?.wth_amt):'',notes:''}}});return n})}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.')}finally{setLoadingRows(false)}},[activeUnion,date]);
+"""
+          new = """ const loadUnion=useCallback(async()=>{if(!activeUnion){setRows([]);return}setLoadingRows(true);try{const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));const byId=new Map<string,any>((Array.isArray(d)?d:[]).map((r:any)=>[String(r.id),r]));const visible=clients.filter((c:any)=>(String(c.union??'').trim()||'Unassigned')===activeUnion).map((c:any)=>{const r=byId.get(String(c.id));return r?{...r,id:c.id,name:c.name,savings_balance:Number(r.savings_balance||0)}:{id:c.id,name:c.name,loan:{},savings_balance:0,existing:{loan_amt:0,sav_amt:0,wth_type:'',wth_amt:0}};});setRows(visible);setEdits(p=>{const n={...p};visible.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0);const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):''}}});return n})}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.')}finally{setLoadingRows(false)}},[activeUnion,date,clients]);
+"""
           if old not in s:
               raise SystemExit('Combined target block not found')
           s = s.replace(old, new)
-          s = s.replace("c.union===null||c.union===undefined||c.union===''?'Unassigned':String(c.union)", "String(c.union??'').trim()||'Unassigned'")
           p.write_text(s)
           PY
-
       - name: Commit mobile fix
         run: |
           git config user.name "github-actions[bot]"
