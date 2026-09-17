@@ -8,4 +8,4 @@ import { useThemeStore } from '../../src/store/theme';
 import { api } from '../../src/api/client';
 import type { Client } from '../../src/types';
 
-const money=(v:any)=>`₦${Number(v||0).toLocaleString('en-NG',{maximumFractionDigits:0})`;
+const money=(v:any)=>`₦${Number(v||0).toLocaleString('en-NG',{maximumFractionDigits:0})}`;
