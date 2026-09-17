@@ -1,4 +1,4 @@
-name: Fix combined screen client roster
+name: Fix combined screen client roster v2
 
 on:
   push:
