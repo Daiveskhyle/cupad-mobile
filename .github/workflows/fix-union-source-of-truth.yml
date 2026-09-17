@@ -16,31 +16,61 @@ jobs:
         run: |
           from pathlib import Path
 
-          def patch(path, replacements):
+          def replace_first(path, old, new):
               p = Path(path)
               s = p.read_text()
-              original = s
-              for old, new in replacements:
-                  if old not in s:
-                      raise SystemExit(f'Anchor not found in {path}: {old[:120]}')
-                  s = s.replace(old, new, 1)
-              if s != original:
-                  p.write_text(s)
+              if old not in s:
+                  print(f'SKIP: anchor not found in {path}: {old[:100]}')
+                  return False
+              ns = s.replace(old, new, 1)
+              if ns != s:
+                  p.write_text(ns)
+                  print(f'PATCHED: {path}')
+                  return True
+              return False
 
-          patch('app/co/combined.tsx', [
-              ("const n=Array.from(new Set(a.map((c:any)=>String(c.union||'').trim()||'Unassigned'))).sort((x,y)=>x.localeCompare(y));", "const n=Array.from(new Set(a.map((c:any)=>c.union===null||c.union===undefined||c.union===''?'Unassigned':String(c.union)))).sort((x,y)=>x.localeCompare(y));"),
-              ("const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);", "const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);"),
-              ("const count=clients.filter((c:any)=>(String(c.union||'').trim()||'Unassigned')===u).length;", "const count=clients.filter((c:any)=>(c.union===null||c.union===undefined||c.union===''?'Unassigned':String(c.union))===u).length;")
-          ])
+          exact_union = "c.union===null||c.union===undefined||c.union===''?'Unassigned':String(c.union)"
 
-          patch('app/co/savings.tsx', [
-              ("const n=Array.from(new Set(active.map((c:any)=>String(c.union||'').trim()||'Unassigned'))).sort((x,y)=>x.localeCompare(y));", "const n=Array.from(new Set(active.map((c:any)=>c.union===null||c.union===undefined||c.union===''?'Unassigned':String(c.union)))).sort((x,y)=>x.localeCompare(y));"),
-              ("(String(c.union||'').trim()||'Unassigned')===activeUnion", "(c.union===null||c.union===undefined||c.union===''?'Unassigned':String(c.union))===activeUnion")
-          ])
+          replace_first(
+              'app/co/combined.tsx',
+              "String(c.union||'').trim()||'Unassigned'",
+              exact_union
+          )
+          replace_first(
+              'app/co/combined.tsx',
+              "(String(c.union||'').trim()||'Unassigned')===u",
+              f'({exact_union})===u'
+          )
+
+          replace_first(
+              'app/co/savings.tsx',
+              "String(c.union || '').trim() || 'Unassigned'",
+              exact_union
+          )
+          replace_first(
+              'app/co/savings.tsx',
+              "(String(c.union || '').trim() || 'Unassigned') === activeUnion",
+              f'({exact_union}) === activeUnion'
+          )
+          replace_first(
+              'app/co/savings.tsx',
+              "String(c.union||'').trim()||'Unassigned'",
+              exact_union
+          )
+          replace_first(
+              'app/co/savings.tsx',
+              "(String(c.union||'').trim()||'Unassigned')===activeUnion",
+              f'({exact_union})===activeUnion'
+          )
+
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/co/combined.tsx app/co/savings.tsx
-          git diff --cached --quiet || git commit -m "fix: preserve exact PHP union assignments"
-          git push
+          if git diff --cached --quiet; then
+            echo "No union changes were required."
+          else
+            git commit -m "fix: preserve exact PHP union assignments"
+            git push
+          fi
