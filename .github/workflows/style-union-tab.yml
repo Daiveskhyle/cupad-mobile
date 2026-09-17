@@ -1,0 +1,41 @@
+name: Style Combined Union Tabs
+on:
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch union tabs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/co/combined.tsx')
+          s=p.read_text()
+          old='''<View style={styles.sectionHeader}><Text style={[styles.section,{color:colors.text}]}>UNION GROUPS</Text><Text style={[styles.hint,{color:colors.textMuted}]}>{unions.length} groups</Text></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>{unions.map(u=><Pressable key={u} onPress={()=>{setActiveUnion(u);setQuery('')}} style={[styles.tab,{backgroundColor:colors.card,borderColor:colors.border},activeUnion===u&&{backgroundColor:colors.primary,borderColor:colors.primary}]}><Text style={[styles.tabText,{color:activeUnion===u?'#fff':colors.textSecondary}]}>{u}</Text></Pressable>)}</ScrollView>'''
+          new='''<View style={styles.sectionHeader}><View><Text style={[styles.section,{color:colors.text}]}>UNION GROUPS</Text><Text style={[styles.hint,{color:colors.textMuted}]}>{unions.length} groups</Text></View></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingVertical:2,paddingRight:16,gap:8}}>{unions.map(u=>{const active=activeUnion===u;const count=clients.filter((c:any)=>(String(c.union||'').trim()||'Unassigned')===u).length;return <Pressable key={u} onPress={()=>{setActiveUnion(u);setQuery('')}} style={[styles.tab,{backgroundColor:active?colors.primary:colors.card,borderColor:active?colors.primary:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:13,paddingVertical:9,borderRadius:12}]}><Ionicons name={active?'people':'people-outline'} size={15} color={active?'#fff':colors.textSecondary}/><Text style={[styles.tabText,{color:active?'#fff':colors.text,marginLeft:7,maxWidth:150}]} numberOfLines={1}>{u}</Text><View style={{marginLeft:7,minWidth:22,height:22,paddingHorizontal:6,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:active?'rgba(255,255,255,.2)':colors.infoBg}}><Text style={{fontSize:11,fontWeight:'800',color:active?'#fff':colors.primary}}>{count}</Text></View></Pressable>})}</ScrollView>'''
+          if old not in s:
+              raise SystemExit('Union tab block not found; no changes made.')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/co/combined.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'style: match combined union tabs to savings'
+          git push
+      - name: Remove patch workflow
+        if: always()
+        run: |
+          rm -f .github/workflows/style-union-tab.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/style-union-tab.yml
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore: remove one-time union tab patch workflow'
+          git push
