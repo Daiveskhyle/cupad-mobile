@@ -1,0 +1,33 @@
+name: Fix Combined Screen From PHP Source
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message != 'fix: combined screen roster from PHP source'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Combined screen
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('app/co/combined.tsx')
+          s=p.read_text()
+          pattern=r" const loadUnion=useCallback\(async\(\)=>\{.*?\},\[activeUnion,date\]\);"
+          replacement=""" const loadUnion=useCallback(async()=>{if(!activeUnion){setRows([]);return}setLoadingRows(true);try{const d:any[]=await api.getCombinedUnionData(activeUnion==='Unassigned'?'':activeUnion,date);const apiSettings=(d as any).__settings;if(apiSettings)setSettings((p)=>({...p,...apiSettings}));const apiRows=Array.isArray(d)?d:[];const byId=new Map<string,any>();apiRows.forEach((r:any)=>byId.set(String(r.id),r));const visible=clients.filter((c:any)=>{const u=String(c.union??'').trim();return (u||'Unassigned')===activeUnion;}).map((c:any)=>{const r=byId.get(String(c.id));if(r)return {...r,id:c.id,name:c.name,savings_balance:Number(r.savings_balance||0),existing:r.existing||{loan_amt:0,sav_amt:0,wth_type:'',wth_amt:0}};return {id:c.id,name:c.name,loan:null,savings_balance:0,existing:{loan_amt:0,sav_amt:0,wth_type:'',wth_amt:0}};});setRows(visible);setEdits(p=>{const n={...p};visible.forEach((r:any)=>{if(!n[r.id]){const inst=Number(r.loan?.inst_amt||0);const existingAmount=Number(r.existing?.loan_amt||0);const existingCount=inst>0?Math.round(existingAmount/inst):0;n[r.id]={savings:r.existing?.sav_amt?String(r.existing.sav_amt):'',installment:existingAmount?String(existingAmount):'',installmentCount:existingCount?String(existingCount):'',withdrawalType:r.existing?.wth_type||'',withdrawal:r.existing?.wth_amt?String(r.existing.wth_amt):''}}});return n})}catch(e:any){Alert.alert('Unable to load union',e?.message||'Please try again.')}finally{setLoadingRows(false)}},[activeUnion,date,clients]);"""
+          out,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+          if n!=1: raise SystemExit('Combined loadUnion block not found')
+          p.write_text(out)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/combined.tsx
+          git diff --cached --quiet || (git commit -m "fix: combined screen roster from PHP source" && git push origin HEAD:main)
