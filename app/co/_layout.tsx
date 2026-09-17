@@ -1,9 +1,10 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Stack, router, usePathname } from 'expo-router';
+import { Image, Pressable, Text, View } from 'react-native';
+import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/auth';
 import { useThemeStore } from '../../src/store/theme';
 import { API_BASE_URL } from '../../src/constants/config';
+import BottomNav from '../../src/components/BottomNav';
 
 const CUPAD_LOGO = 'https://cupad.name.ng/uploads/CUPAD%20LOGO.png';
 
@@ -12,7 +13,6 @@ export default function CoLayout() {
   const themeMode = useThemeStore((s) => s.mode);
   const toggleTheme = useThemeStore((s) => s.toggle);
   const user = useAuthStore((s) => s.user);
-  const pathname = usePathname();
 
   const displayName = user?.full_name || user?.name || user?.username || 'User';
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'U';
@@ -25,16 +25,6 @@ export default function CoLayout() {
     return `${origin}/${clean}`;
   })();
 
-  const navItems = [
-    { label: 'Collect', icon: 'cash-outline' as const, activeIcon: 'cash' as const, route: '/co/combined' },
-    { label: 'Savings', icon: 'wallet-outline' as const, activeIcon: 'wallet' as const, route: '/co/savings' },
-    { label: 'Repay', icon: 'card-outline' as const, activeIcon: 'card' as const, route: '/co/loan-collection' },
-    { label: 'Disburse', icon: 'arrow-up-circle-outline' as const, activeIcon: 'arrow-up-circle' as const, route: '/co/disbursement' },
-    { label: 'More', icon: 'grid-outline' as const, activeIcon: 'grid' as const, route: '/co/union-groups' },
-  ];
-
-  const isActive = (route: string) => pathname === route || pathname.startsWith(`${route}/`);
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack
@@ -44,7 +34,7 @@ export default function CoLayout() {
           headerShadowVisible: false,
           headerTitleAlign: 'left',
           headerTitle: () => null,
-          contentStyle: { backgroundColor: colors.background, paddingBottom: 78 },
+          contentStyle: { backgroundColor: colors.background, paddingBottom: 70 },
           headerLeft: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 0, gap: 8 }}>
               <Image source={{ uri: CUPAD_LOGO }} style={{ width: 32, height: 32 }} resizeMode="contain" />
@@ -53,12 +43,7 @@ export default function CoLayout() {
           ),
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 2 }}>
-              <Pressable
-                onPress={toggleTheme}
-                accessibilityRole="button"
-                accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}
-              >
+              <Pressable onPress={toggleTheme} accessibilityRole="button" accessibilityLabel={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBg }}>
                 <Ionicons name={themeMode === 'dark' ? 'sunny' : 'moon'} size={19} color={colors.primary} />
               </Pressable>
               <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Open profile">
@@ -83,73 +68,7 @@ export default function CoLayout() {
         <Stack.Screen name="close-account" options={{ title: 'Close Client Account' }} />
         <Stack.Screen name="passkey" options={{ title: 'Passkey Setup' }} />
       </Stack>
-
-      <View style={[styles.navbar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-        {navItems.map((item) => {
-          const active = isActive(item.route);
-          return (
-            <Pressable
-              key={item.route}
-              onPress={() => router.replace(item.route as any)}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              style={({ pressed }) => [styles.navItem, pressed && { opacity: 0.7 }]}
-            >
-              <View style={[styles.iconWrap, active && { backgroundColor: colors.infoBg }]}>
-                <Ionicons
-                  name={active ? item.activeIcon : item.icon}
-                  size={21}
-                  color={active ? colors.primary : colors.textSecondary}
-                />
-              </View>
-              <Text style={[styles.navLabel, { color: active ? colors.primary : colors.textSecondary }, active && styles.navLabelActive]}>
-                {item.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <BottomNav />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  navbar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 70,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 4,
-    paddingBottom: 4,
-    elevation: 12,
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: -3 },
-  },
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 62,
-  },
-  iconWrap: {
-    width: 38,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navLabel: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  navLabelActive: {
-    fontWeight: '800',
-  },
-});
