@@ -1,0 +1,85 @@
+name: Fix Savings Screen Source
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-savings-screen-source.yml'
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch savings screen
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('app/co/savings.tsx')
+          s = path.read_text()
+          original = s
+
+          # PHP source uses the exact union value from clients.union and maps only
+          # NULL to Unassigned. Do not trim, because trimming can merge distinct unions.
+          old_union = "const names = Array.from(new Set(active.map((c: any) => String(c.union || '').trim() || 'Unassigned'))).sort((a, b) => a.localeCompare(b));"
+          new_union = "const names = Array.from(new Set(active.map((c: any) => c.union === null || c.union === undefined || c.union === '' ? 'Unassigned' : String(c.union)))).sort((a, b) => a.localeCompare(b));"
+          if old_union in s:
+              s = s.replace(old_union, new_union, 1)
+
+          # Replace the savings row loader so the screen follows the PHP savings page:
+          # clients are scoped by officer, union values are exact, and the portfolio
+          # savings balance is used instead of the combined endpoint's balance.
+          pattern = re.compile(r"  const loadUnion = useCallback\(async \(\) => \{.*?\n  \}, \[activeUnion, clients, date\]\);", re.S)
+          replacement = '''  const loadUnion = useCallback(async () => {
+    if (!activeUnion) { setRows([]); return; }
+    setLoadingRows(true);
+    try {
+      const selected = clients.filter((c) =>
+        (c.union === null || c.union === undefined || c.union === '' ? 'Unassigned' : String(c.union)) === activeUnion
+      );
+
+      const loaded = await Promise.all(selected.map(async (client) => {
+        try {
+          const portfolio = await api.getPortfolio(client.id);
+          const savingsBalance = Number(portfolio?.savings?.balance ?? 0);
+          const loanBalance = Number(portfolio?.loans?.reduce?.((sum: number, loan: any) => sum + Number(loan?.remaining_balance ?? loan?.balance ?? 0), 0) ?? 0);
+          return {
+            ...client,
+            savings_balance: Number.isFinite(savingsBalance) ? savingsBalance : 0,
+            loan_outstanding: Number.isFinite(loanBalance) ? loanBalance : 0,
+            amount: '',
+          };
+        } catch {
+          return { ...client, savings_balance: 0, loan_outstanding: 0, amount: '' };
+        }
+      }));
+
+      setRows(loaded.sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (e: any) {
+      Alert.alert('Unable to load union', e?.message || 'Please try again.');
+      setRows([]);
+    } finally { setLoadingRows(false); }
+  }, [activeUnion, clients]);'''
+
+          if pattern.search(s):
+              s = pattern.sub(replacement, s, count=1)
+          else:
+              raise SystemExit('Savings loadUnion block not found')
+
+          if s == original:
+              print('No source changes required')
+          else:
+              path.write_text(s)
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/savings.tsx
+          git diff --cached --quiet || git commit -m "fix: align savings screen with PHP source"
+          git push
