@@ -13,6 +13,7 @@ export default function TabsLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
   const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const colors = useThemeStore((s) => s.colors);
   const themeMode = useThemeStore((s) => s.mode);
   const toggleTheme = useThemeStore((s) => s.toggle);
@@ -30,6 +31,11 @@ export default function TabsLayout() {
     const origin = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
     return `${origin}/${clean}`;
   })();
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(auth)/login');
+  };
 
   return (
     <Tabs
@@ -55,6 +61,9 @@ export default function TabsLayout() {
               <View style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: colors.primary, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                 {profileUri ? <Image source={{ uri: profileUri }} style={{ width: '100%', height: '100%' }} /> : <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '800' }}>{initials}</Text>}
               </View>
+            </Pressable>
+            <Pressable onPress={handleLogout} accessibilityRole="button" accessibilityLabel="Sign out" style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEE2E2' }}>
+              <Ionicons name="log-out-outline" size={19} color="#DC2626" />
             </Pressable>
           </View>
         ),
