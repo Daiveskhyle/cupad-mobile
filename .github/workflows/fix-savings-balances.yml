@@ -1,0 +1,75 @@
+name: Fix Savings And Loan Balances
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-savings-balances.yml'
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch savings balance loading
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/co/savings.tsx')
+          s = p.read_text()
+          old = """        try {
+          const portfolio = await api.getPortfolio(client.id);
+          return {
+            ...client,
+            savings_balance: Number(portfolio?.savings?.balance || 0),
+            loan_outstanding: Number(portfolio?.loans?.outstanding || 0),
+            amount: ''
+          };
+        } catch {
+          return { ...client, savings_balance: 0, loan_outstanding: 0, amount: '' };
+        }"""
+          new = """        try {
+          const [portfolio, savingsRows, loanRows] = await Promise.all([
+            api.getPortfolio(client.id).catch(() => null),
+            api.getSavings(client.id).catch(() => []),
+            api.getLoans(client.id).catch(() => [])
+          ]);
+
+          const savingsList = Array.isArray(savingsRows) ? savingsRows : [];
+          const loanList = Array.isArray(loanRows) ? loanRows : [];
+
+          const savingsFromRows = savingsList.reduce((sum: number, item: any) => {
+            const value = Number(item?.balance ?? item?.amount ?? 0);
+            return sum + (Number.isFinite(value) ? value : 0);
+          }, 0);
+          const loanFromRows = loanList.reduce((sum: number, item: any) => {
+            const status = String(item?.status ?? '').toLowerCase();
+            const remaining = Number(item?.remaining_balance ?? item?.outstanding ?? item?.balance ?? 0);
+            if (status === 'completed' || remaining <= 0) return sum;
+            return sum + (Number.isFinite(remaining) ? remaining : 0);
+          }, 0);
+
+          const portfolioSavings = Number(portfolio?.savings?.balance ?? portfolio?.savings?.total ?? 0);
+          const portfolioLoan = Number(portfolio?.loans?.outstanding ?? portfolio?.loans?.remaining_balance ?? portfolio?.loans?.balance ?? 0);
+
+          return {
+            ...client,
+            savings_balance: savingsFromRows !== 0 ? savingsFromRows : (Number.isFinite(portfolioSavings) ? portfolioSavings : 0),
+            loan_outstanding: loanFromRows !== 0 ? loanFromRows : (Number.isFinite(portfolioLoan) ? portfolioLoan : 0),
+            amount: ''
+          };
+        } catch {
+          return { ...client, savings_balance: 0, loan_outstanding: 0, amount: '' };
+        }"""
+          if old not in s:
+              raise SystemExit('Savings balance loading block not found')
+          p.write_text(s.replace(old, new, 1))
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/co/savings.tsx
+          git diff --cached --quiet || git commit -m "fix: load savings and loan balances from API data"
+          git push
