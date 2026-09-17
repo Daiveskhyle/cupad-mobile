@@ -13,7 +13,7 @@ const parseDate = (value: string) => { const [y, m, d] = value.split('-').map(Nu
 const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 type Settings = { min_savings_amount: number; max_savings_amount: number; allow_weekend_collection: number; savings_date_readonly: number };
-type Row = Client & { savings_balance: number; loan_outstanding: number; amount: string; notes: string };
+type Row = Client & { savings_balance: number; loan_outstanding: number; amount: string };
 const defaultSettings: Settings = { min_savings_amount: 100, max_savings_amount: 1000000, allow_weekend_collection: 0, savings_date_readonly: 0 };
 
 export default function SavingsCollectionScreen() {
@@ -59,7 +59,6 @@ export default function SavingsCollectionScreen() {
             savings_balance: Number(portfolio?.savings?.balance || 0),
             loan_outstanding: Number(portfolio?.loans?.outstanding || 0),
             amount: '',
-            notes: ''
           };
         } catch {
           return { ...client, savings_balance: 0, loan_outstanding: 0, amount: '', notes: '' };
@@ -80,7 +79,7 @@ export default function SavingsCollectionScreen() {
   const totalBalances = filtered.reduce((sum, r) => sum + Number(r.savings_balance || 0), 0);
   const enteredCount = filtered.filter((r) => Number(String(r.amount).replace(/,/g, '')) > 0).length;
 
-  const setRow = (id: string, key: 'amount' | 'notes', value: string) => setRows((prev) => prev.map((r) => r.id === id ? { ...r, [key]: value } : r));
+  const setRow = (id: string, value: string) => setRows((prev) => prev.map((r) => r.id === id ? { ...r, amount: value } : r));
 
   const handleDateChange = (event: DateTimePickerEvent, selected?: Date) => {
     if (dateLocked) return;
@@ -106,10 +105,13 @@ export default function SavingsCollectionScreen() {
     }
     setSavingId(row.id);
     try {
-      const res = await api.collectSavings({ client_id: row.id, amount, date, notes: row.notes || undefined });
+      const existing = await api.getSavings(row.id);
+      const duplicate = existing.some((tx: any) => String(tx?.type || '').toLowerCase() === 'deposit' && String(tx?.date || '').slice(0, 10) === date);
+      if (duplicate) { Alert.alert('Duplicate transaction', `${row.name} already has a savings collection for ${date}.`); return; }
+      const res = await api.collectSavings({ client_id: row.id, amount, date });
       if (!res?.success) throw new Error(res?.error || res?.message || 'Unable to save savings collection.');
       Alert.alert('Collection saved', `${row.name}\n${res.message || 'Savings recorded successfully.'}`);
-      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, savings_balance: Number(r.savings_balance || 0) + amount, amount: '', notes: '' } : r));
+      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, savings_balance: Number(r.savings_balance || 0) + amount, amount: '' } : r));
     } catch (e: any) {
       Alert.alert('Collection failed', e?.message || 'Unable to save savings collection.');
     } finally { setSavingId(null); }
@@ -155,8 +157,7 @@ export default function SavingsCollectionScreen() {
               </View>
             </View>
 
-            <View style={styles.amountRow}><View style={[styles.amountWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}><Text style={[styles.currency, { color: colors.primary }]}>₦</Text><TextInput value={row.amount} onChangeText={(v) => setRow(row.id, 'amount', v)} placeholder="0" placeholderTextColor={colors.textMuted} keyboardType="decimal-pad" style={[styles.amountInput, { color: colors.text }]} /></View><Pressable onPress={() => saveRow(row)} disabled={savingId === row.id} style={[styles.collectBtn, { backgroundColor: colors.primary, opacity: savingId === row.id ? 0.65 : 1 }]}>{savingId === row.id ? <ActivityIndicator color="#fff" /> : <><Ionicons name="checkmark" size={18} color="#fff" /><Text style={styles.collectText}>Collect</Text></>}</Pressable></View>
-            <TextInput value={row.notes} onChangeText={(v) => setRow(row.id, 'notes', v)} placeholder="Notes (optional)" placeholderTextColor={colors.textMuted} style={[styles.notes, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} />
+            <View style={styles.amountRow}><View style={[styles.amountWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}><Text style={[styles.currency, { color: colors.primary }]}>₦</Text><TextInput value={row.amount} onChangeText={(v) => setRow(row.id, v)} placeholder="0" placeholderTextColor={colors.textMuted} keyboardType="decimal-pad" style={[styles.amountInput, { color: colors.text }]} /></View><Pressable onPress={() => saveRow(row)} disabled={savingId === row.id} style={[styles.collectBtn, { backgroundColor: colors.primary, opacity: savingId === row.id ? 0.65 : 1 }]}>{savingId === row.id ? <ActivityIndicator color="#fff" /> : <><Ionicons name="checkmark" size={18} color="#fff" /><Text style={styles.collectText}>Collect</Text></>}</Pressable></View>
           </View>
         ))}
 
