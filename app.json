@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "scheme": "cupad",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ng.name.cupad.mobile"
